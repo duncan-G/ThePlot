@@ -1,0 +1,186 @@
+@import 'tailwindcss';
+
+:root {
+    color-scheme: dark;
+    --font-mono: 'Courier Prime', 'Courier New', monospace;
+    --radius: 0.625rem;
+
+    --background: #09090b;
+    --foreground: #f4f4f5;
+
+    --card: #18181b;
+    --card-foreground: #f4f4f5;
+
+    --primary: #f59e0b;
+    --primary-foreground: #09090b;
+
+    --secondary: #27272a;
+    --secondary-foreground: #f4f4f5;
+
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+
+    --accent: #27272a;
+    --accent-foreground: #f4f4f5;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #f4f4f5;
+
+    --border: #27272a;
+    --input: #27272a;
+    --ring: #f59e0b;
+
+    --scene-heading: #fbbf24;
+    --action-text: #d4d4d8;
+    --dialogue-text: #e4e4e7;
+    --vo-text: #93c5fd;
+    --paren-text: #71717a;
+    --transition-text: #71717a;
+    --char-cue: #a1a1aa;
+    --char-pill-bg: #27272a;
+    --char-pill-text: #a1a1aa;
+
+    --scene-badge-bg: rgba(245, 158, 11, 0.2);
+    --scene-badge-text: #fbbf24;
+    --loc-badge-bg: #27272a;
+    --loc-badge-text: #a1a1aa;
+
+    --scrollbar-thumb: #a1a1aa;
+    --scrollbar-thumb-hover: #d4d4d8;
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+
+    --background: #fafaf9;
+    --foreground: #1c1917;
+
+    --card: #ffffff;
+    --card-foreground: #1c1917;
+
+    --primary: #d97706;
+    --primary-foreground: #ffffff;
+
+    --secondary: #f5f5f4;
+    --secondary-foreground: #1c1917;
+
+    --muted: #e7e5e4;
+    --muted-foreground: #78716c;
+
+    --accent: #f5f5f4;
+    --accent-foreground: #1c1917;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+
+    --border: #d6d3d1;
+    --input: #d6d3d1;
+    --ring: #d97706;
+
+    --scene-heading: #92400e;
+    --action-text: #44403c;
+    --dialogue-text: #292524;
+    --vo-text: #1d4ed8;
+    --paren-text: #78716c;
+    --transition-text: #78716c;
+    --char-cue: #57534e;
+    --char-pill-bg: #f5f5f4;
+    --char-pill-text: #57534e;
+
+    --scene-badge-bg: rgba(217, 119, 6, 0.15);
+    --scene-badge-text: #92400e;
+    --loc-badge-bg: #f5f5f4;
+    --loc-badge-text: #78716c;
+
+    --scrollbar-thumb: #a8a29e;
+    --scrollbar-thumb-hover: #78716c;
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-scene-heading: var(--scene-heading);
+    --color-action-text: var(--action-text);
+    --color-dialogue-text: var(--dialogue-text);
+    --color-vo-text: var(--vo-text);
+    --color-paren-text: var(--paren-text);
+    --color-transition-text: var(--transition-text);
+    --color-char-cue: var(--char-cue);
+    --color-char-pill-bg: var(--char-pill-bg);
+    --color-char-pill-text: var(--char-pill-text);
+    --color-scene-badge-bg: var(--scene-badge-bg);
+    --color-scene-badge-text: var(--scene-badge-text);
+    --color-loc-badge-bg: var(--loc-badge-bg);
+    --color-loc-badge-text: var(--loc-badge-text);
+    --font-mono: var(--font-mono);
+}
+
+body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-mono);
+}
+
+button {
+    cursor: pointer;
+}
+button:disabled {
+    cursor: default;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+}
+
+.vertical-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.vertical-scroll::-webkit-scrollbar {
+    width: 12px;
+}
+.vertical-scroll::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 6px;
+}
+.vertical-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+@keyframes pulse-slow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+.animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

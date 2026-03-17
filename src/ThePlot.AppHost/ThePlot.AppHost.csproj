@@ -1,0 +1,29 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.1.2">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ultra.ThePlot.AppHost</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>32388501-7a2e-46d9-ab68-6d44a0c97d54</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThePlot.Api.Grpc\ThePlot.Api.Grpc.csproj" />
+    <ProjectReference Include="..\ThePlot.Functions.PdfValidation\ThePlot.Functions.PdfValidation.csproj" />
+    <ProjectReference Include="..\ThePlot.SchemaBuilder\ThePlot.SchemaBuilder.csproj" />
+    <ProjectReference Include="..\ThePlot.Workers.PdfProcessing\ThePlot.Workers.PdfProcessing.csproj" />
+    <ProjectReference Include="..\ThePlot.Workers.PdfSplitting\ThePlot.Workers.PdfSplitting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Functions" Version="13.1.2" />
+    <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="13.1.2" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.1.2" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.1.2" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.1.2" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.1.2" />
+  </ItemGroup>
+</Project>

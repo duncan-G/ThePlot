@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Ultra.ThePlot.Workers.PdfSplitting</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThePlot.Core\ThePlot.Core.csproj" />
+    <ProjectReference Include="..\..\libs\ServiceDefaults\ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" Version="13.1.2" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.1.2" />
+    <PackageReference Include="MuPDF.NET" Version="3.2.12" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,74 @@
+using System.Diagnostics;
+
+namespace ThePlot.AppHost.SchemaBuilder;
+
+internal static class SchemaBuilderCommands
+{
+    public static async Task<ExecuteCommandResult> ExecuteRebuildSchemaAsync(
+        ExecuteCommandContext context,
+        string schemaBuilderDir,
+        IResourceWithConnectionString postgresDb)
+    {
+        var connectionString = await postgresDb
+            .GetConnectionStringAsync(context.CancellationToken)
+            ?? throw new InvalidOperationException("Connection string ust-db not found. Ensure the application is running.");
+
+        // Build the schema builder project
+        var buildInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = "build",
+            WorkingDirectory = schemaBuilderDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            Environment =
+            {
+                ["ConnectionStrings__ust-db"] = connectionString
+            }
+        };
+
+        var buildProcess = Process.Start(buildInfo);
+        if (buildProcess is null)
+        {
+            return CommandResults.Failure("Failed to start build process.");
+        }
+
+        await buildProcess.WaitForExitAsync(context.CancellationToken);
+        if (buildProcess.ExitCode != 0)
+        {
+            var stderr = await buildProcess.StandardError.ReadToEndAsync(context.CancellationToken);
+            return CommandResults.Failure($"Build failed with exit code {buildProcess.ExitCode}: {stderr}");
+        }
+
+        // Run the schema builder project
+        var runInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = "run --no-build --rebuild-schema",
+            WorkingDirectory = schemaBuilderDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            Environment =
+            {
+                ["ConnectionStrings__ust-db"] = connectionString
+            }
+        };
+
+        var runProcess = Process.Start(runInfo);
+        if (runProcess is null)
+        {
+            return CommandResults.Failure("Failed to start schema builder process.");
+        }
+
+        await runProcess.WaitForExitAsync(context.CancellationToken);
+        if (runProcess.ExitCode != 0)
+        {
+            var stderr = await runProcess.StandardError.ReadToEndAsync(context.CancellationToken);
+            return CommandResults.Failure($"Schema rebuild failed with exit code {runProcess.ExitCode}: {stderr}");
+        }
+
+        return CommandResults.Success();
+    }
+}

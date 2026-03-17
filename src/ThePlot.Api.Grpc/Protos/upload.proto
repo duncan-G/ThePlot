@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option csharp_namespace = "ThePlot.Api.Grpc";
+
+package upload;
+
+// Service for requesting upload tokens to upload PDFs to Azure Blob Storage.
+service Upload {
+  // Returns a short-lived SAS token (90s) allowing direct upload of a PDF blob.
+  rpc RequestUploadToken (UploadTokenRequest) returns (UploadTokenResponse);
+}
+
+message UploadTokenRequest {
+  // Optional client-provided filename; if omitted, a unique name is generated.
+  string filename = 1;
+}
+
+message UploadTokenResponse {
+  // Full URL with SAS query string for PUT upload. Valid for 90 seconds.
+  string upload_url = 1;
+  // Blob path/name to use when uploading (for client reference).
+  string blob_name = 2;
+}

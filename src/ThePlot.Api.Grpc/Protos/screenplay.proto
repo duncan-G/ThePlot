@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+option csharp_namespace = "ThePlot.Api.Grpc";
+
+package screenplay;
+
+service ScreenplayService {
+  // Server-streaming: subscribe with blob_name after upload to receive real-time import status events.
+  rpc StreamImportStatus (StreamImportStatusRequest) returns (stream ImportStatusEvent);
+
+  // Fetch the screenplay with scenes and elements. Use after ChunkProcessDone to get newly available data.
+  rpc GetScreenplay (GetScreenplayRequest) returns (GetScreenplayResponse);
+}
+
+message StreamImportStatusRequest {
+  string blob_name = 1;
+}
+
+message ImportStatusEvent {
+  // BlobUploaded | ValidationFailed | ValidationPassed | ChunkSplitDone | ChunkProcessDone | ChunkProcessFailed | ImportFailed
+  string kind = 1;
+  string screenplay_id = 2;
+  string error_message = 3;
+  int32 start_page = 4;
+  int32 end_page = 5;
+  int32 total_pages = 6;
+}
+
+message GetScreenplayRequest {
+  string screenplay_id = 1;
+}
+
+message GetScreenplayResponse {
+  string id = 1;
+  string title = 2;
+  repeated string authors = 3;
+  repeated SceneMessage scenes = 4;
+  int32 total_pages = 5;
+}
+
+message SceneMessage {
+  string id = 1;
+  string heading = 2;
+  string location_type = 3;
+  string location = 4;
+  string time_of_day = 5;
+  int32 page = 6;
+  repeated string characters = 7;
+  repeated SceneElementMessage elements = 8;
+}
+
+message SceneElementMessage {
+  string id = 1;
+  string type = 2;
+  string text = 3;
+  string character = 4;
+  int32 page = 5;
+  int32 sequence_order = 6;
+}

@@ -1,0 +1,91 @@
+# =========================
+# .NET
+# =========================
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Oo]ut/
+[Tt]est[Rr]esults/
+[Tt]ests/[Rr]esults/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+packages/
+!packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.vs/
+*.rsuser
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+
+# Rider
+.idea/
+*.sln.iml
+
+# User-specific files (MonoDevelop/Xamarin Studio)
+*.userprefs
+
+# Azure Functions
+local.settings.json
+
+# =========================
+# IDEs and editors
+# =========================
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history/
+
+# VSCode (allow specific config files)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+
+# =========================
+# System files
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
