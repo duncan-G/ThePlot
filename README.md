@@ -28,7 +28,7 @@ graph TD
     Processor -- "⑥ Status Queue" --> Listener
     Listener -- "⑦ gRPC Stream (ImportStatus)" --> Client
     
-    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    classDef default fill:#e8e8e8,stroke:#333,stroke-width:2px,color:#222;
 ```
 
 ---
@@ -98,10 +98,12 @@ graph TD
     Func[PdfValidationFunction]
     Q1[(pdf-splitting-priority)]
     Q2[(pdf-splitting-standard)]
+    N1[First chunk only - pages 1-10]
+    N2[Remaining chunks enqueued later - 11-20, 21-30, ...]
 
-    Func -- "Single message: { BlobName, StartPage: 1, EndPage: 10, ScreenplayId }" --> Q1
-    Note right of Q1: First chunk only (pages 1–10)
-    Note right of Q2: Remaining chunks enqueued later (11–20, 21–30, …)
+    Func -- "Single message: BlobName, StartPage 1, EndPage 10, ScreenplayId" --> Q1
+    Q1 -.-> N1
+    Q2 -.-> N2
 ```
 
 **Why split the first 10 pages first?** - **Fast time-to-content**: Users see the beginning of their screenplay quickly.  
@@ -119,7 +121,7 @@ graph TD
     SP_Q[(pdf-splitting-priority)]
     SS_Q[(pdf-splitting-standard)]
     
-    Worker[PdfSplittingWorker: Download from pdf-uploads, Extract pages (MuPDF), Upload to pdf-chunks, Enqueue to processor]
+    Worker["PdfSplittingWorker: Download from pdf-uploads, Extract pages (MuPDF), Upload to pdf-chunks, Enqueue to processor"]
     
     PP_Q[(pdf-processing-priority chunk 1–10)]
     PS_Q[(pdf-processing-standard chunks 11–20, ...)]
@@ -148,11 +150,11 @@ graph TD
     PP_Q[(pdf-processing-priority)]
     PS_Q[(pdf-processing-standard)]
     
-    Worker[PdfProcessingWorker: Download chunk from pdf-chunks, Parse screenplay (regex), Persist to PostgreSQL, Send Status Event]
+    Worker["PdfProcessingWorker: Download chunk from pdf-chunks, Parse screenplay (regex), Persist to PostgreSQL, Send Status Event"]
     
     Stat_Q[(screenplay-import-status)]
     
-    Listener[ScreenplayImportStatus Listener (gRPC API): Update chunk status in DB, Publish to EventBus]
+    Listener["ScreenplayImportStatus Listener (gRPC API): Update chunk status in DB, Publish to EventBus"]
     
     DB[(PostgreSQL)]
     Bus[EventBus in-memory fan-out]
@@ -230,8 +232,8 @@ flowchart TD
     Processor -- "EF Core" --> DB
     StatusListener -- "Updates Status" --> DB
     
-    classDef storage fill:#f9db8e,stroke:#333;
-    classDef worker fill:#cde4f7,stroke:#333;
+    classDef storage fill:#c9a227,stroke:#333,color:#fff;
+    classDef worker fill:#1e5a8e,stroke:#333,color:#fff;
     class Blob,DB,ASB storage;
     class Splitter,Processor worker;
 ```
