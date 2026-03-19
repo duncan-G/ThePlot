@@ -9,7 +9,7 @@ builder.AddAzureServiceBusClient("messaging");
 builder.Services.AddDatabaseServices(options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
-    var connectionString = builder.Configuration.GetConnectionString("ust-db")
+    var connectionString = builder.Configuration.GetConnectionString("theplot-db")
         ?? throw new ArgumentException("Database connection string is invalid.");
     options.ConnectionString = connectionString;
 });

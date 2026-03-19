@@ -30,7 +30,7 @@ public sealed class ThePlotContext(
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasDefaultSchema("story_book");
+        modelBuilder.HasDefaultSchema("theplot");
         modelBuilder.HasPostgresExtension("vector");
 
         modelBuilder.Entity<Screenplay>(builder =>

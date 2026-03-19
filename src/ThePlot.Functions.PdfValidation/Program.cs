@@ -32,8 +32,8 @@ var host = new HostBuilder()
         services.AddDatabaseServices(options =>
         {
             config.GetSection("Database").Bind(options);
-            options.ConnectionString = config.GetConnectionString("ust-db")
-                ?? throw new InvalidOperationException("Database connection string 'ust-db' not found.");
+            options.ConnectionString = config.GetConnectionString("theplot-db")
+                ?? throw new InvalidOperationException("Database connection string 'theplot-db' not found.");
         });
 
         services.Configure<WorkerOptions>(o =>

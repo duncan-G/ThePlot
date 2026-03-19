@@ -11,7 +11,7 @@ internal static class SchemaBuilderCommands
     {
         var connectionString = await postgresDb
             .GetConnectionStringAsync(context.CancellationToken)
-            ?? throw new InvalidOperationException("Connection string ust-db not found. Ensure the application is running.");
+            ?? throw new InvalidOperationException("Connection string theplot-db not found. Ensure the application is running.");
 
         // Build the schema builder project
         var buildInfo = new ProcessStartInfo
@@ -24,7 +24,7 @@ internal static class SchemaBuilderCommands
             UseShellExecute = false,
             Environment =
             {
-                ["ConnectionStrings__ust-db"] = connectionString
+                ["ConnectionStrings__theplot-db"] = connectionString
             }
         };
 
@@ -52,7 +52,7 @@ internal static class SchemaBuilderCommands
             UseShellExecute = false,
             Environment =
             {
-                ["ConnectionStrings__ust-db"] = connectionString
+                ["ConnectionStrings__theplot-db"] = connectionString
             }
         };
 

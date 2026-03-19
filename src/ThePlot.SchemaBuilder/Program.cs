@@ -10,11 +10,11 @@ using ThePlot.Database;
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
-        // Aspire injects ConnectionStrings__ust-db; fall back to appsettings Database:ConnectionString
-        var connectionString = context.Configuration["ConnectionStrings:ust-db"]
+        // Aspire injects ConnectionStrings__theplot-db; fall back to appsettings Database:ConnectionString
+        var connectionString = context.Configuration["ConnectionStrings:theplot-db"]
             ?? context.Configuration.GetSection("Database")["ConnectionString"]
             ?? throw new InvalidOperationException(
-                "Connection string not configured. Set ConnectionStrings__ust-db (Aspire) or Database:ConnectionString (appsettings).");
+                "Connection string not configured. Set ConnectionStrings__theplot-db (Aspire) or Database:ConnectionString (appsettings).");
         var commandTimeout = context.Configuration.GetValue("Database:CommandTimeout", 30);
 
         services.AddCoreDatabaseServices<ThePlotContext>(options =>

@@ -19,7 +19,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Without this, azd infra gen fails with "The application model does not support role assignments."
 if (builder.ExecutionContext.IsPublishMode)
 {
-    builder.AddAzureContainerAppEnvironment("ust-aca-env")
+    builder.AddAzureContainerAppEnvironment("theplot-aca-env")
         .WithAzdResourceNaming();
 }
 
@@ -27,14 +27,14 @@ var otelCollector = builder.AddOpenTelemetryCollector("otel-collector", "../otel
 
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "pg18")
-    .WithVolume("ust-volume", "/var/lib/postgresql")
+    .WithVolume("theplot-volume", "/var/lib/postgresql")
     .WithInitFiles("PostgresInit")
     .WithPgAdmin();
-var postgresDb = postgres.AddDatabase("ust-db");
+var postgresDb = postgres.AddDatabase("theplot-db");
 
 var schemaBuilderProject = new Projects.ThePlot_SchemaBuilder();
 var schemaBuilderDir = Path.GetDirectoryName(schemaBuilderProject.ProjectPath)!;
-var schemaBuilder = builder.AddProject<Projects.ThePlot_SchemaBuilder>("ust-schema-builder")
+var schemaBuilder = builder.AddProject<Projects.ThePlot_SchemaBuilder>("theplot-schema-builder")
     .WithReference(postgresDb)
     .WaitFor(postgresDb)
     .WithCommand(
