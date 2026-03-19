@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using ThePlot.AppHost;
 using ThePlot.AppHost.EnvoyProxy;
 using ThePlot.AppHost.OpenTelemetryCollector;
-using ThePlot.AppHost.SchemaBuilder;
+using ThePlot.AppHost.Postgres;
 
 await AzureFunctionsCoreTools.EnsureAsync();
 
@@ -25,28 +25,7 @@ if (builder.ExecutionContext.IsPublishMode)
 
 var otelCollector = builder.AddOpenTelemetryCollector("otel-collector");
 
-var postgres = builder.AddPostgres("postgres")
-    .WithImage("pgvector/pgvector", "pg18")
-    .WithVolume("theplot-volume", "/var/lib/postgresql")
-    .WithInitFiles("PostgresInit")
-    .WithPgAdmin();
-var postgresDb = postgres.AddDatabase("theplot-db");
-
-var schemaBuilderProject = new Projects.ThePlot_SchemaBuilder();
-var schemaBuilderDir = Path.GetDirectoryName(schemaBuilderProject.ProjectPath)!;
-var schemaBuilder = builder.AddProject<Projects.ThePlot_SchemaBuilder>("theplot-schema-builder")
-    .WithReference(postgresDb)
-    .WaitFor(postgresDb)
-    .WithCommand(
-        "rebuild-schema",
-        "Rebuild",
-        context => SchemaBuilderCommands.ExecuteRebuildSchemaAsync(context, schemaBuilderDir, postgresDb.Resource),
-        new CommandOptions
-        {
-            IconName = "ArrowClockwise",
-            IconVariant = IconVariant.Filled,
-            IsHighlighted = true
-        });
+var (_, postgresDb, schemaBuilder) = builder.AddDatabase();
 
 var pdfBlobStorage = builder.AddAzureStorage("pdf-storage");
 if (!builder.ExecutionContext.IsPublishMode)

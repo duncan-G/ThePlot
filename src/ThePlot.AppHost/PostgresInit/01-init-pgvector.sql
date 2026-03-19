@@ -1,7 +1,7 @@
--- Create appdata database and enable pgvector extension.
+-- Create theplot-db database and enable pgvector extension.
 -- Runs at container startup; Aspire's AddDatabase will skip create if already exists.
-CREATE DATABASE appdata;
+CREATE DATABASE "theplot-db";
 
-\connect appdata
+\connect "theplot-db"
 
 CREATE EXTENSION IF NOT EXISTS vector;

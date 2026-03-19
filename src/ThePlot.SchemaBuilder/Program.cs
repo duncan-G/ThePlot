@@ -10,7 +10,6 @@ using ThePlot.Database;
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
-        // Aspire injects ConnectionStrings__theplot-db; fall back to appsettings Database:ConnectionString
         var connectionString = context.Configuration["ConnectionStrings:theplot-db"]
             ?? context.Configuration.GetSection("Database")["ConnectionString"]
             ?? throw new InvalidOperationException(
@@ -34,15 +33,6 @@ using var host = Host.CreateDefaultBuilder(args)
     })
     .Build();
 
-var cancellationTokenSource = new CancellationTokenSource();
-
-Console.CancelKeyPress += (_, e) =>
-{
-    Console.WriteLine("Cancellation requested. Running cleanup...");
-    cancellationTokenSource.Cancel();
-    e.Cancel = true;
-};
-
 var rebuild = args.Contains("--rebuild-schema", StringComparer.OrdinalIgnoreCase);
 
 try
@@ -51,38 +41,30 @@ try
     var dbContext = scope.ServiceProvider.GetRequiredService<ThePlotContext>();
     var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
 
-    if (await databaseCreator.ExistsAsync())
-    {
-        if (rebuild)
-        {
-            var schema = dbContext.Model.GetDefaultSchema();
-            Console.WriteLine($"Rebuild requested. Dropping and recreating schema: {schema}...");
-
-#pragma warning disable EF1002
-            await dbContext.Database.ExecuteSqlRawAsync($@"
-                DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;",
-#pragma warning restore EF1002
-                cancellationTokenSource.Token);
-
-            await databaseCreator.CreateTablesAsync(cancellationTokenSource.Token);
-        }
-        else
-        {
-            Console.WriteLine("Database and schema already exist. Skipping (use --rebuild to drop and recreate).");
-        }
-    }
-    else
+    if (!await databaseCreator.ExistsAsync())
     {
         Console.WriteLine("Creating database...");
-        await dbContext.Database.EnsureCreatedAsync(cancellationTokenSource.Token);
+        await databaseCreator.CreateAsync();
     }
 
-    Console.WriteLine("Creating vector extension...");
-    await dbContext.Database.ExecuteSqlRawAsync(
-        "CREATE EXTENSION IF NOT EXISTS vector;",
-        cancellationTokenSource.Token);
+    if (rebuild)
+    {
+        var schema = dbContext.Model.GetDefaultSchema();
+        Console.WriteLine($"Rebuild requested. Dropping and recreating schema: {schema}...");
 
-    Console.WriteLine("Schema creation complete.");
+#pragma warning disable EF1002
+        await dbContext.Database.ExecuteSqlRawAsync($@"
+            DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;
+            CREATE SCHEMA ""{schema}"";");
+#pragma warning restore EF1002
+
+        await databaseCreator.CreateTablesAsync();
+    }
+    
+    await dbContext.Database.EnsureCreatedAsync();
+
+
+    Console.WriteLine("Schema creation/update complete.");
 }
 catch (Exception ex)
 {

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace ThePlot.AppHost.SchemaBuilder;
+namespace ThePlot.AppHost.Postgres;
 
 internal static class SchemaBuilderCommands
 {
