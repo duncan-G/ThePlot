@@ -1,5 +1,4 @@
 #pragma warning disable ASPIRECERTIFICATES001
-using System.Net.Sockets;
 using Azure.Provisioning;
 using Azure.Provisioning.Storage;
 using Azure.Storage.Blobs;
@@ -8,12 +7,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ThePlot.AppHost;
+using ThePlot.AppHost.EnvoyProxy;
 using ThePlot.AppHost.OpenTelemetryCollector;
 using ThePlot.AppHost.SchemaBuilder;
 
 await AzureFunctionsCoreTools.EnsureAsync();
 
 var builder = DistributedApplication.CreateBuilder(args);
+
+// Required for role assignments (e.g. WithRoleAssignments on pdf-validation-functions).
+// Without this, azd infra gen fails with "The application model does not support role assignments."
+if (builder.ExecutionContext.IsPublishMode)
+{
+    builder.AddAzureContainerAppEnvironment("aca-env")
+        .WithAzdResourceNaming();
+}
 
 var otelCollector = builder.AddOpenTelemetryCollector("otel-collector", "../../infra/otel-collector/config.yaml");
 
@@ -40,9 +48,10 @@ var schemaBuilder = builder.AddProject<Projects.ThePlot_SchemaBuilder>("ust-sche
             IsHighlighted = true
         });
 
-var pdfBlobStorage = builder
-    .AddAzureStorage("pdf-storage")
-    .RunAsEmulator(emulator =>
+var pdfBlobStorage = builder.AddAzureStorage("pdf-storage");
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    pdfBlobStorage = pdfBlobStorage.RunAsEmulator(emulator =>
     {
         // Don't change - these ports are Azure Storage Explorer's default emulator ports.
         // So, no need to configure anything when accessing storage explorer
@@ -50,17 +59,21 @@ var pdfBlobStorage = builder
             .WithQueuePort(10001)
             .WithTablePort(10002);
     });
+}
 var pdfBlobs = pdfBlobStorage.AddBlobs("blobs");
 
-var serviceBus = builder.AddAzureServiceBus("messaging")
-    .RunAsEmulator();
+var serviceBus = builder.AddAzureServiceBus("messaging");
+if (!builder.ExecutionContext.IsPublishMode)
+{
+    serviceBus = serviceBus.RunAsEmulator();
+}
 serviceBus.AddServiceBusQueue("pdf-splitting-priority");
 serviceBus.AddServiceBusQueue("pdf-splitting-standard");
 serviceBus.AddServiceBusQueue("pdf-processing-priority");
 serviceBus.AddServiceBusQueue("pdf-processing-standard");
 serviceBus.AddServiceBusQueue("screenplay-import-status");
 
-var apiGrpcService = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-service")
+var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-service")
     .WithHttpsEndpoint(name: "grpc")
     .WithHttpsCertificateConfiguration(ctx =>
     {
@@ -78,6 +91,7 @@ var apiGrpcService = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-ser
 
 builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-validation-functions")
     .WithHostStorage(pdfBlobStorage)
+    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataOwner)
     .WithReference(serviceBus)
     .WithReference(postgresDb)
     .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Core", "Warning")
@@ -104,61 +118,56 @@ builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worke
     .WaitFor(schemaBuilder)
     .WaitFor(otelCollector);
 
-var envoyProxy = builder.AddContainer("envoy-proxy", "envoyproxy/envoy", "v1.34-latest")
-    .WithHttpEndpoint(port: 11901, targetPort: 9901, name: "admin")
-    .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
-    .WithHttpsEndpoint(port: 11000, targetPort: 8080, isProxied: false)
-    .WithEndpoint("quic", e =>
-    {
-        e.Port = 11000;
-        e.TargetPort = 8080;
-        e.Protocol = ProtocolType.Udp;
-        e.UriScheme = "udp";
-        e.IsProxied = false;
-    })
-    .WithBindMount("../../infra/envoy", "/etc/envoy", isReadOnly: true)
-    .WithEntrypoint("/bin/sh")
-    .WithArgs("/etc/envoy/entrypoint.sh")
-    .WithHttpHealthCheck("/ready", statusCode: 200, endpointName: "admin")
-    .WithHttpsCertificateConfiguration(ctx =>
-    {
-        ctx.EnvironmentVariables["TLS_CERT_PATH"] = ctx.CertificatePath;
-        ctx.EnvironmentVariables["TLS_KEY_PATH"] = ctx.KeyPath;
-        return Task.CompletedTask;
-    })
-    .WithReference(apiGrpcService)
-    .WithEnvironment("GRPC_ENDPOINT", apiGrpcService.GetEndpoint("grpc"))
-    .WaitFor(apiGrpcService)
-    .WithEnvironment("OTEL_COLLECTOR_GRPC_ENDPOINT", otelCollector.GetEndpoint("grpc"))
-    .WithEnvironment("OTEL_COLLECTOR_HTTP_ENDPOINT", otelCollector.GetEndpoint("http"))
+var envoyProxy = builder.AddEnvoyProxy("envoy-proxy", grpcServer, otelCollector)
+    .WithReference(grpcServer)
+    .WaitFor(grpcServer)
     .WaitFor(otelCollector);
 
-var clientApp = builder.AddJavaScriptApp("client-app", "../../client", runScriptName: "start")
-    .WithHttpsEndpoint(port: 4200, env: "PORT")
-    .WithUrlForEndpoint("https", u => u.DisplayText = "Client App")
-    .WithHttpsCertificateConfiguration(ctx =>
-    {
-        ctx.EnvironmentVariables["TLS_CERT_PATH"] = ctx.CertificatePath;
-        ctx.EnvironmentVariables["TLS_KEY_PATH"] = ctx.KeyPath;
-        return Task.CompletedTask;
-    })
-    .WithEnvironment("SERVER_URL", envoyProxy.GetEndpoint("https"))
-    .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyProxy.GetEndpoint("https")}/otlp/v1"))
-    .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
-    .WithEnvironment("NG_ALLOWED_HOSTS", "*.dev.localhost")
-    .WaitFor(envoyProxy);
-
 const string clientScheme = "https";
-var clientEndpoint = clientApp.GetEndpoint(
-    clientScheme,
-    builder.Environment.IsDevelopment()
-        ? KnownNetworkIdentifiers.LocalhostNetwork
-        : KnownNetworkIdentifiers.PublicInternet
-    );
+EndpointReference clientEndpoint;
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    var envoyPublicEndpoint = envoyProxy.GetEndpoint("https", KnownNetworkIdentifiers.PublicInternet);
+
+    var clientApp = builder.AddDockerfile("client-app", "../../client")
+        .WithHttpEndpoint(targetPort: 4000, env: "PORT")
+        .WithExternalHttpEndpoints()
+        .WithEnvironment("SERVER_URL", envoyPublicEndpoint)
+        .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyPublicEndpoint}/otlp/v1"))
+        .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
+        .WaitFor(envoyProxy);
+
+    clientEndpoint = clientApp.GetEndpoint("http", KnownNetworkIdentifiers.PublicInternet);
+}
+else
+{
+    var clientApp = builder.AddJavaScriptApp("client-app", "../../client", runScriptName: "start")
+        .WithHttpsEndpoint(port: 4200, env: "PORT")
+        .WithUrlForEndpoint("https", u => u.DisplayText = "Client App")
+        .WithHttpsCertificateConfiguration(ctx =>
+        {
+            ctx.EnvironmentVariables["TLS_CERT_PATH"] = ctx.CertificatePath;
+            ctx.EnvironmentVariables["TLS_KEY_PATH"] = ctx.KeyPath;
+            return Task.CompletedTask;
+        })
+        .WithEnvironment("SERVER_URL", envoyProxy.GetEndpoint("https"))
+        .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyProxy.GetEndpoint("https")}/otlp/v1"))
+        .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
+        .WithEnvironment("NG_ALLOWED_HOSTS", "*.dev.localhost")
+        .WaitFor(envoyProxy);
+
+    clientEndpoint = clientApp.GetEndpoint("https", KnownNetworkIdentifiers.LocalhostNetwork);
+}
+
 var clientHostAndPort = clientEndpoint.Property(EndpointProperty.HostAndPort);
 envoyProxy.WithEnvironment("CORS_ORIGIN_EXACT", clientEndpoint);
 envoyProxy.WithEnvironment("CORS_ORIGIN_SUBDOMAIN_REGEX", $"{clientScheme}://*.{clientHostAndPort}");
-envoyProxy.WithEnvironment("ALLOWED_HOSTS", envoyProxy.GetEndpoint(clientScheme, KnownNetworkIdentifiers.LocalhostNetwork).Property(EndpointProperty.HostAndPort));
+
+var envoyNetwork = builder.ExecutionContext.IsPublishMode
+    ? KnownNetworkIdentifiers.PublicInternet
+    : KnownNetworkIdentifiers.LocalhostNetwork;
+envoyProxy.WithEnvironment("ALLOWED_HOSTS", envoyProxy.GetEndpoint("https", envoyNetwork).Property(EndpointProperty.HostAndPort));
 
 // Configure blob storage CORS at runtime for Azurite emulator (ConfigureInfrastructure only applies to Azure provisioning)
 // See: https://github.com/dotnet/aspire/discussions/5552#discussioncomment-15239416
