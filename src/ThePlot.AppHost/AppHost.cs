@@ -19,11 +19,11 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Without this, azd infra gen fails with "The application model does not support role assignments."
 if (builder.ExecutionContext.IsPublishMode)
 {
-    builder.AddAzureContainerAppEnvironment("aca-env")
+    builder.AddAzureContainerAppEnvironment("ust-aca-env")
         .WithAzdResourceNaming();
 }
 
-var otelCollector = builder.AddOpenTelemetryCollector("otel-collector", "../../infra/otel-collector/config.yaml");
+var otelCollector = builder.AddOpenTelemetryCollector("otel-collector", "../otel-collector/config.yaml");
 
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "pg18")

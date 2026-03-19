@@ -3,7 +3,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROTOC_GEN="$REPO_ROOT/infra/protoc-gen"
+PROTOC_GEN="$REPO_ROOT/src/protoc-gen"
 cd "$REPO_ROOT"
 
 mkdir -p client/src/lib/services

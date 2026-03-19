@@ -1,5 +1,5 @@
 // This file is auto-generated. Do not edit manually.
-// To regenerate, run: node infra/protoc-gen/generate_error_codes.js
+// To regenerate, run: node src/protoc-gen/generate_error_codes.js
 
 export const ErrorCodes = {
     MissingParameter: "1000",

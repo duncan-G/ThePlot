@@ -5,7 +5,7 @@ public static class EnvoyProxyResourceBuilderExtensions
 {
     private const string ImageName = "envoyproxy/envoy";
     private const string ImageTag = "v1.34-latest";
-    private const string EnvoyConfigPath = "../../infra/envoy";
+    private const string EnvoyConfigPath = "../envoy";
 
     public static IResourceBuilder<ContainerResource> AddEnvoyProxy<TApiGrpc, TOtel>(
         this IDistributedApplicationBuilder builder,
@@ -25,7 +25,7 @@ public static class EnvoyProxyResourceBuilderExtensions
 
         return resource
             // Azure Container Apps require HTTP endpoints to use port 80
-            .WithHttpEndpoint(targetPort: 80, name: "admin", isProxied: false)
+            .WithHttpEndpoint(targetPort: 9901, name: "admin", isProxied: false)
             .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
             .WithHttpsEndpoint(targetPort: 8080, isProxied: false)
             .WithEntrypoint("/bin/sh")

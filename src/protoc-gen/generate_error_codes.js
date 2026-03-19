@@ -33,7 +33,7 @@ function parseCSharpConstants(content) {
 function generateTsContent(constants) {
   const lines = [];
   lines.push('// This file is auto-generated. Do not edit manually.');
-  lines.push('// To regenerate, run: node infra/protoc-gen/generate_error_codes.js');
+  lines.push('// To regenerate, run: node src/protoc-gen/generate_error_codes.js');
   lines.push('');
   lines.push('export const ErrorCodes = {');
   const sortedKeys = Object.keys(constants).sort((a, b) => {

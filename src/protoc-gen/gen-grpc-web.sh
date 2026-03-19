@@ -93,7 +93,7 @@ OUTPUT_DIR_ABS="$(cd "$INITIAL_CWD" && cd "$output_directory_path" && pwd)"
 # Build image if not present
 if ! docker image inspect protoc-gen-grpc-web:latest >/dev/null 2>&1; then
     echo "Building protoc-gen-grpc-web image..."
-    docker build -t protoc-gen-grpc-web:latest "$REPO_ROOT/infra/protoc-gen"
+    docker build -t protoc-gen-grpc-web:latest "$REPO_ROOT/src/protoc-gen"
 fi
 
 docker run --rm \
