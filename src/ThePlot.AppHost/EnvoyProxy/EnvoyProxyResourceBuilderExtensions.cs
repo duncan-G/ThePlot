@@ -24,8 +24,7 @@ public static class EnvoyProxyResourceBuilderExtensions
                 .WithBindMount(envoyConfigPath, "/etc/envoy", isReadOnly: true);
 
         return resource
-            // Azure Container Apps require HTTP endpoints to use port 80
-            .WithHttpEndpoint(targetPort: 9901, name: "admin", isProxied: false)
+            .WithHttpEndpoint(targetPort: 80, name: "admin", isProxied: false)
             .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
             .WithHttpsEndpoint(targetPort: 8080, isProxied: false)
             .WithEntrypoint("/bin/sh")
