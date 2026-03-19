@@ -70,6 +70,7 @@ var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-service
 
 builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-validation-functions")
     .WithHostStorage(pdfBlobStorage)
+    .WithReference(pdfBlobs)
     .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataOwner)
     .WithReference(serviceBus)
     .WithReference(postgresDb)

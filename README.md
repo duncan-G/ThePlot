@@ -271,3 +271,13 @@ aspire run
 ```
 
 In console logs, you will see a link to the Aspire dashboard. There you can access every service in the app.
+
+### Deployment
+**Requirements**
+- Azure Subscription
+- [Azure Developer Cli](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows)
+
+```
+azd up
+azd deploy
+```
