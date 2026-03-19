@@ -3,27 +3,18 @@ namespace ThePlot.AppHost.EnvoyProxy;
 
 public static class EnvoyProxyResourceBuilderExtensions
 {
-    private const string ImageName = "envoyproxy/envoy";
-    private const string ImageTag = "v1.34-latest";
     private const string EnvoyConfigPath = "../envoy";
 
     public static IResourceBuilder<ContainerResource> AddEnvoyProxy<TApiGrpc, TOtel>(
         this IDistributedApplicationBuilder builder,
         string name,
         IResourceBuilder<TApiGrpc> grpcServerResource,
-        IResourceBuilder<TOtel> otelCollector,
-        string envoyConfigPath = EnvoyConfigPath)
+        IResourceBuilder<TOtel> otelCollector)
         where TApiGrpc : IResourceWithEndpoints
         where TOtel : IResourceWithEndpoints
     {
-        // In publish mode, use custom image with entrypoint.sh and envoy.yaml.tmpl baked in.
-        // Azure File volume is empty, so bind mount content is not available in production.
-        var resource = builder.ExecutionContext.IsPublishMode
-            ? builder.AddDockerfile(name, EnvoyConfigPath)
-            : builder.AddContainer(name, ImageName, ImageTag)
-                .WithBindMount(envoyConfigPath, "/etc/envoy", isReadOnly: true);
-
-        return resource
+        return builder
+            .AddDockerfile(name, EnvoyConfigPath)
             .WithHttpEndpoint(targetPort: 80, name: "admin", isProxied: false)
             .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
             .WithHttpsEndpoint(targetPort: 8080, isProxied: false)

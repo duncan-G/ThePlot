@@ -10,24 +10,21 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
     private const string DashboardOtlpUrlVariableName = "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL";
     private const string DashboardOtlpApiKeyVariableName = "AppHost:OtlpApiKey";
     private const string DashboardOtlpUrlDefaultValue = "http://localhost:18889";
-    private const string ImageName = "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib";
-    private const string ImageTag = "0.123.0";
+    private const string OtelConfigPath = "../otel-collector";
 
-    public static IResourceBuilder<OpenTelemetryCollectorResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name, string configFileLocation)
+    public static IResourceBuilder<ContainerResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name)
     {
         var url = builder.Configuration[DashboardOtlpUrlVariableName] ?? DashboardOtlpUrlDefaultValue;
         var isHttpsEnabled = url.StartsWith("https", StringComparison.OrdinalIgnoreCase);
 
         var dashboardOtlpEndpoint = new HostUrl(url);
 
-        var collectorResource = new OpenTelemetryCollectorResource(name);
-        var resourceBuilder = builder.AddResource(collectorResource)
-            .WithImage(ImageName, ImageTag)
+        var resourceBuilder = builder
+            .AddDockerfile(name, OtelConfigPath)
             .WithEndpoint(targetPort: 4317, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: "http")
             .WithEndpoint(targetPort: 4318, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: "http")
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
-            .WithBindMount(configFileLocation, "/etc/otelcol-contrib/config.yaml")
             .WithEnvironment("ASPIRE_ENDPOINT", $"{dashboardOtlpEndpoint}")
             .WithEnvironment("ASPIRE_API_KEY", builder.Configuration[DashboardOtlpApiKeyVariableName])
             .WithEnvironment("ASPIRE_INSECURE", isHttpsEnabled ? "false" : "true");
@@ -35,8 +32,14 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
         builder.Eventing.Subscribe<BeforeStartEvent>((e, ct) =>
         {
             var logger = e.Services.GetRequiredService<ILogger<OpenTelemetryCollectorResource>>();
-            var endpoint = collectorResource.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName);
+            var appModel = e.Services.GetRequiredService<DistributedApplicationModel>();
+            var collector = appModel.Resources.OfType<ContainerResource>().FirstOrDefault(r => r.Name == name);
+            if (collector is null)
+            {
+                return Task.CompletedTask;
+            }
 
+            var endpoint = collector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName);
             if (!endpoint.Exists)
             {
                 logger.LogWarning("No {EndpointName} endpoint for the collector.", OpenTelemetryCollectorResource.OtlpGrpcEndpointName);
@@ -44,7 +47,6 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
             }
 
             // Update all resources to forward telemetry to the collector.
-            var appModel = e.Services.GetRequiredService<DistributedApplicationModel>();
             foreach (var resource in appModel.Resources)
             {
                 resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
@@ -62,7 +64,7 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
 
         if (isHttpsEnabled && builder.ExecutionContext.IsRunMode && builder.Environment.IsDevelopment())
         {
-            resourceBuilder.WithArgs(@"--config=/etc/otelcol-contrib/config.yaml");
+            resourceBuilder.WithArgs("--config=/etc/otelcol-contrib/config.yaml");
         }
 
         return resourceBuilder;

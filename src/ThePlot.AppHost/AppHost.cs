@@ -23,7 +23,7 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithAzdResourceNaming();
 }
 
-var otelCollector = builder.AddOpenTelemetryCollector("otel-collector", "../otel-collector/config.yaml");
+var otelCollector = builder.AddOpenTelemetryCollector("otel-collector");
 
 var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "pg18")
