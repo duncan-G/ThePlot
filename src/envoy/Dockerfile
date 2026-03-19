@@ -1,7 +1,7 @@
 # Generate self-signed cert for production (when Aspire dev cert is unavailable)
 FROM debian:bookworm-slim AS certgen
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+RUN mkdir -p /tls && openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout /tls/key.pem -out /tls/cert.pem \
   -subj "/CN=envoy-proxy" -addext "subjectAltName=DNS:*,DNS:localhost,IP:127.0.0.1"
 
