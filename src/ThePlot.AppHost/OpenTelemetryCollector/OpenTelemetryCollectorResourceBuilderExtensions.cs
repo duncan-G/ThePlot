@@ -11,6 +11,8 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
     private const string DashboardOtlpApiKeyVariableName = "AppHost:OtlpApiKey";
     private const string DashboardOtlpUrlDefaultValue = "http://localhost:18889";
     private const string OtelConfigPath = "../otel-collector";
+    private const int OtlpGrpcContainerPort = 4317;
+    private const int OtlpHttpContainerPort = 4318;
 
     public static IResourceBuilder<ContainerResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name)
     {
@@ -21,13 +23,15 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
 
         var resourceBuilder = builder
             .AddDockerfile(name, OtelConfigPath)
-            .WithEndpoint(targetPort: 4317, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: "http")
-            .WithEndpoint(targetPort: 4318, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: "http")
+            .WithEndpoint(targetPort: OtlpGrpcContainerPort, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: "http")
+            .WithEndpoint(targetPort: OtlpHttpContainerPort, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: "http")
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithEnvironment("ASPIRE_ENDPOINT", $"{dashboardOtlpEndpoint}")
             .WithEnvironment("ASPIRE_API_KEY", builder.Configuration[DashboardOtlpApiKeyVariableName])
-            .WithEnvironment("ASPIRE_INSECURE", isHttpsEnabled ? "false" : "true");
+            .WithEnvironment("ASPIRE_INSECURE", isHttpsEnabled ? "false" : "true")
+            .WithEnvironment("OTLP_GRPC_PORT", OtlpGrpcContainerPort.ToString())
+            .WithEnvironment("OTLP_HTTP_PORT", OtlpHttpContainerPort.ToString());
 
         builder.Eventing.Subscribe<BeforeStartEvent>((e, ct) =>
         {

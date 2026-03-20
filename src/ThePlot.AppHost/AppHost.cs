@@ -52,14 +52,8 @@ serviceBus.AddServiceBusQueue("pdf-processing-priority");
 serviceBus.AddServiceBusQueue("pdf-processing-standard");
 serviceBus.AddServiceBusQueue("screenplay-import-status");
 
-var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-service")
-    .WithHttpsEndpoint(name: "grpc")
-    .WithHttpsCertificateConfiguration(ctx =>
-    {
-        ctx.EnvironmentVariables["ASPNETCORE_Kestrel__Certificates__Default__Path"] = ctx.CertificatePath;
-        ctx.EnvironmentVariables["ASPNETCORE_Kestrel__Certificates__Default__KeyPath"] = ctx.KeyPath;
-        return Task.CompletedTask;
-    })
+var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("grpc-service")
+    .WithHttpEndpoint(name: "grpc")
     .WithReference(postgresDb)
     .WithReference(pdfBlobs, "pdf-storage")
     .WithReference(serviceBus)
@@ -71,7 +65,11 @@ var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("api-grpc-service
 builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-validation-functions")
     .WithHostStorage(pdfBlobStorage)
     .WithReference(pdfBlobs)
-    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataOwner)
+    .WithRoleAssignments(pdfBlobStorage,
+        StorageBuiltInRole.StorageBlobDataOwner,
+        StorageBuiltInRole.StorageAccountContributor,
+        StorageBuiltInRole.StorageQueueDataContributor,
+        StorageBuiltInRole.StorageTableDataContributor)
     .WithReference(serviceBus)
     .WithReference(postgresDb)
     .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Core", "Warning")
@@ -108,7 +106,7 @@ EndpointReference clientEndpoint;
 
 if (builder.ExecutionContext.IsPublishMode)
 {
-    var envoyPublicEndpoint = envoyProxy.GetEndpoint("https", KnownNetworkIdentifiers.PublicInternet);
+    var envoyPublicEndpoint = envoyProxy.GetEndpoint("http", KnownNetworkIdentifiers.PublicInternet);
 
     var clientApp = builder.AddDockerfile("client-app", "../../client")
         .WithHttpEndpoint(targetPort: 4000, env: "PORT")
@@ -131,8 +129,8 @@ else
             ctx.EnvironmentVariables["TLS_KEY_PATH"] = ctx.KeyPath;
             return Task.CompletedTask;
         })
-        .WithEnvironment("SERVER_URL", envoyProxy.GetEndpoint("https"))
-        .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyProxy.GetEndpoint("https")}/otlp/v1"))
+        .WithEnvironment("SERVER_URL", envoyProxy.GetEndpoint("http"))
+        .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyProxy.GetEndpoint("http")}/otlp/v1"))
         .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
         .WithEnvironment("NG_ALLOWED_HOSTS", "*.dev.localhost")
         .WaitFor(envoyProxy);
@@ -142,12 +140,14 @@ else
 
 var clientHostAndPort = clientEndpoint.Property(EndpointProperty.HostAndPort);
 envoyProxy.WithEnvironment("CORS_ORIGIN_EXACT", clientEndpoint);
-envoyProxy.WithEnvironment("CORS_ORIGIN_SUBDOMAIN_REGEX", $"{clientScheme}://*.{clientHostAndPort}");
+envoyProxy.WithCorsOriginSubdomainRegexIfDevelopment(
+    builder,
+    ReferenceExpression.Create($"{clientScheme}://*.{clientHostAndPort}"));
 
 var envoyNetwork = builder.ExecutionContext.IsPublishMode
     ? KnownNetworkIdentifiers.PublicInternet
     : KnownNetworkIdentifiers.LocalhostNetwork;
-envoyProxy.WithEnvironment("ALLOWED_HOSTS", envoyProxy.GetEndpoint("https", envoyNetwork).Property(EndpointProperty.HostAndPort));
+envoyProxy.WithEnvironment("ALLOWED_HOSTS", envoyProxy.GetEndpoint("http", envoyNetwork).Property(EndpointProperty.HostAndPort));
 
 // Configure blob storage CORS at runtime for Azurite emulator (ConfigureInfrastructure only applies to Azure provisioning)
 // See: https://github.com/dotnet/aspire/discussions/5552#discussioncomment-15239416

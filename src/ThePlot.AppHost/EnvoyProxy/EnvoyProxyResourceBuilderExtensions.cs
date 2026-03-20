@@ -1,4 +1,3 @@
-#pragma warning disable ASPIRECERTIFICATES001
 namespace ThePlot.AppHost.EnvoyProxy;
 
 public static class EnvoyProxyResourceBuilderExtensions
@@ -17,18 +16,26 @@ public static class EnvoyProxyResourceBuilderExtensions
             .AddDockerfile(name, EnvoyConfigPath)
             .WithHttpEndpoint(targetPort: 80, name: "admin", isProxied: false)
             .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
-            .WithHttpsEndpoint(targetPort: 8080, isProxied: false)
+            .WithHttpEndpoint(targetPort: 8080, isProxied: false)
             .WithEntrypoint("/bin/sh")
             .WithArgs("/etc/envoy/entrypoint.sh")
             .WithHttpHealthCheck("/ready", statusCode: 200, endpointName: "admin")
-            .WithHttpsCertificateConfiguration(ctx =>
-            {
-                ctx.EnvironmentVariables["TLS_CERT_PATH"] = ctx.CertificatePath;
-                ctx.EnvironmentVariables["TLS_KEY_PATH"] = ctx.KeyPath;
-                return Task.CompletedTask;
-            })
             .WithEnvironment("GRPC_ENDPOINT", grpcServerResource.GetEndpoint("grpc"))
             .WithEnvironment("OTEL_COLLECTOR_GRPC_ENDPOINT", otelCollector.GetEndpoint("grpc"))
             .WithEnvironment("OTEL_COLLECTOR_HTTP_ENDPOINT", otelCollector.GetEndpoint("http"));
+    }
+
+    public static IResourceBuilder<ContainerResource> WithCorsOriginSubdomainRegexIfDevelopment<TValue>(
+        this IResourceBuilder<ContainerResource> envoy,
+        IDistributedApplicationBuilder applicationBuilder,
+        TValue corsOriginSubdomainRegex)
+        where TValue : IValueProvider, IManifestExpressionProvider
+    {
+        if (applicationBuilder.ExecutionContext.IsPublishMode)
+        {
+            return envoy;
+        }
+
+        return envoy.WithEnvironment("CORS_ORIGIN_SUBDOMAIN_REGEX", corsOriginSubdomainRegex);
     }
 }

@@ -39,11 +39,7 @@ static_resources:
                       typed_per_filter_config:
                         envoy.filters.http.cors:
                           "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
-                          allow_origin_string_match:
-                            - exact: "__CORS_ORIGIN_EXACT__"
-                            - safe_regex:
-                                google_re2: {}
-                                regex: "__CORS_ORIGIN_SUBDOMAIN_REGEX__"
+__CORS_ALLOW_ORIGIN_MATCHES__
                           allow_methods: "GET,POST,PUT,DELETE,OPTIONS"
                           allow_headers: "keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,authorization,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout,traceparent,tracestate,b3,baggage"
                           expose_headers: "grpc-status,grpc-message,grpc-messages,error-code,error-codes"
@@ -158,15 +154,6 @@ static_resources:
                         envoy_grpc:
                           cluster_name: otel_collector_grpc_cluster
                         timeout: 0.5s
-          transport_socket:
-            name: envoy.transport_sockets.tls
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-              common_tls_context:
-                alpn_protocols: ["h2", "http/1.1"]
-                tls_certificates:
-                  - certificate_chain: { filename: __TLS_CERT_PATH__ }
-                    private_key: { filename: __TLS_KEY_PATH__ }
   clusters:
     - name: otel_collector_http_cluster
       type: strict_dns
@@ -209,13 +196,6 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {}
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-          sni: __GRPC_API_HOST__
-          common_tls_context:
-            alpn_protocols: ["h2"]
       load_assignment:
         cluster_name: parser_cluster
         endpoints:
