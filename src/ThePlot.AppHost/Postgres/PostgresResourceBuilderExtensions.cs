@@ -2,17 +2,13 @@ namespace ThePlot.AppHost.Postgres;
 
 public static class PostgresResourceBuilderExtensions
 {
-    private const string DatabaseName = "theplot-db";
     private const string InitFilesPath = "PostgresInit";
 
-    /// <summary>
-    /// Adds ThePlot PostgreSQL database and schema builder. Uses container (pgvector) for dev, Azure Flexible Server for prod.
-    /// PgVector is enabled via WithPgVector() for both container (image + init script) and Azure (azure.extensions).
-    /// </summary>
-    public static (IResourceBuilder<Aspire.Hosting.Azure.AzurePostgresFlexibleServerResource> Server, IResourceBuilder<Aspire.Hosting.Azure.AzurePostgresFlexibleServerDatabaseResource> Database, IResourceBuilder<ProjectResource> SchemaBuilder) AddDatabase(
-        this IDistributedApplicationBuilder builder)
+    public static IResourceBuilder<Aspire.Hosting.Azure.AzurePostgresFlexibleServerDatabaseResource> AddDatabase(
+        this IDistributedApplicationBuilder builder,
+        [ResourceName] string name)
     {
-        var postgres = builder.AddAzurePostgresFlexibleServer("postgres");
+        var postgres = builder.AddAzurePostgresFlexibleServer($"{name}-server");
 
         if (!builder.ExecutionContext.IsPublishMode)
         {
@@ -29,17 +25,24 @@ public static class PostgresResourceBuilderExtensions
             postgres = postgres.WithPgVector();
         }
 
-        var postgresDb = postgres.AddDatabase(DatabaseName);
+        return postgres.AddDatabase(name);
+    }
 
-        var schemaBuilderProject = new Projects.ThePlot_SchemaBuilder();
-        var schemaBuilder = builder.AddProject<Projects.ThePlot_SchemaBuilder>("theplot-schema-builder")
+    public static IResourceBuilder<ProjectResource> WithSchemaBuilder<TProject>(
+        this IDistributedApplicationBuilder builder,
+        IResourceBuilder<Aspire.Hosting.Azure.AzurePostgresFlexibleServerDatabaseResource>  postgresDb,
+        [ResourceName] string projectName)
+        where TProject : IProjectMetadata, new()
+    {
+        var schemaBuilderProject = new TProject();
+        var schemaBuilder = builder.AddProject<TProject>(projectName)
             .WithReference(postgresDb)
             .WaitFor(postgresDb);
 
         if (!builder.ExecutionContext.IsPublishMode)
         {
             var schemaBuilderDir = Path.GetDirectoryName(schemaBuilderProject.ProjectPath)!;
-            schemaBuilder = schemaBuilder.WithCommand(
+            schemaBuilder = schemaBuilder.WithCommand( 
                 "rebuild-schema",
                 "Rebuild",
                 context => SchemaBuilderCommands.ExecuteRebuildSchemaAsync(context, schemaBuilderDir, postgresDb.Resource),
@@ -51,6 +54,6 @@ public static class PostgresResourceBuilderExtensions
                 });
         }
 
-        return (postgres, postgresDb, schemaBuilder);
+        return schemaBuilder;
     }
 }

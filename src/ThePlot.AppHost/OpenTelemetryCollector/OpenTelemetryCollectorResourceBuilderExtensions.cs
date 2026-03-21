@@ -14,15 +14,18 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
     private const int OtlpGrpcContainerPort = 4317;
     private const int OtlpHttpContainerPort = 4318;
 
-    public static IResourceBuilder<ContainerResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name)
+    public static IResourceBuilder<OpenTelemetryCollectorResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name)
     {
         var url = builder.Configuration[DashboardOtlpUrlVariableName] ?? DashboardOtlpUrlDefaultValue;
         var isHttpsEnabled = url.StartsWith("https", StringComparison.OrdinalIgnoreCase);
 
         var dashboardOtlpEndpoint = new HostUrl(url);
+        var collectorResource = new OpenTelemetryCollectorResource(name);
 
         var resourceBuilder = builder
-            .AddDockerfile(name, OtelConfigPath)
+            .AddResource(collectorResource)
+            .WithImage("placeholder") // Replaced when the image is built from the Dockerfile (same as AddDockerfile).
+            .WithDockerfile(OtelConfigPath)
             .WithEndpoint(targetPort: OtlpGrpcContainerPort, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: "http")
             .WithEndpoint(targetPort: OtlpHttpContainerPort, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: "http")
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
@@ -37,7 +40,7 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
         {
             var logger = e.Services.GetRequiredService<ILogger<OpenTelemetryCollectorResource>>();
             var appModel = e.Services.GetRequiredService<DistributedApplicationModel>();
-            var collector = appModel.Resources.OfType<ContainerResource>().FirstOrDefault(r => r.Name == name);
+            var collector = appModel.Resources.OfType<OpenTelemetryCollectorResource>().FirstOrDefault(r => r.Name == name);
             if (collector is null)
             {
                 return Task.CompletedTask;

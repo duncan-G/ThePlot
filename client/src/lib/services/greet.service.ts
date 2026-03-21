@@ -6,7 +6,7 @@ import { createTraceUnaryInterceptor } from '../grpc-trace.interceptor';
 
 @Injectable({ providedIn: 'root' })
 export class GreetService {
-  private readonly client = new GreeterClient(inject(SERVER_URL) + '/parser', null, {
+  private readonly client = new GreeterClient(inject(SERVER_URL) + '/api', null, {
     unaryInterceptors: [createTraceUnaryInterceptor()],
   });
 

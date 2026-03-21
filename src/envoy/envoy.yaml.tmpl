@@ -1,7 +1,7 @@
 admin:
   access_log_path: /tmp/admin_access.log
   address:
-    socket_address: { address: 0.0.0.0, port_value: 80 }
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
 
 node:
   id: storybook-proxy
@@ -32,9 +32,9 @@ static_resources:
                 use_remote_address: true
                 xff_num_trusted_hops: 1
                 route_config:
-                  name: parser_routes
+                  name: api_routes
                   virtual_hosts:
-                    - name: parser_vhost
+                    - name: api_vhost
                       domains: __ALLOWED_HOSTS__
                       typed_per_filter_config:
                         envoy.filters.http.cors:
@@ -65,13 +65,7 @@ __CORS_ALLOW_ORIGIN_MATCHES__
                         - match:
                             prefix: "/api/"
                           route:
-                            cluster: parser_cluster
-                            prefix_rewrite: "/"
-                            timeout: 0s
-                        - match:
-                            prefix: "/parser/"
-                          route:
-                            cluster: parser_cluster
+                            cluster: api_cluster
                             prefix_rewrite: "/"
                             timeout: 0s
                             max_stream_duration:
@@ -186,7 +180,7 @@ __CORS_ALLOW_ORIGIN_MATCHES__
                       address: __OTEL_GRPC_HOST__
                       port_value: __OTEL_GRPC_PORT__
 
-    - name: parser_cluster
+    - name: api_cluster
       connect_timeout: 5s
       type: logical_dns
       dns_lookup_family: V4_ONLY
@@ -197,7 +191,7 @@ __CORS_ALLOW_ORIGIN_MATCHES__
           explicit_http_config:
             http2_protocol_options: {}
       load_assignment:
-        cluster_name: parser_cluster
+        cluster_name: api_cluster
         endpoints:
           - lb_endpoints:
               - endpoint:

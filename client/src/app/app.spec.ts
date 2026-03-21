@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { GreetService } from '../lib/services/greet.service';
-import { ParserService } from '../lib/services/parser.service';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -9,7 +8,6 @@ describe('App', () => {
       imports: [App],
       providers: [
         { provide: GreetService, useValue: { sayHello: async () => 'Hello Test' } },
-        { provide: ParserService, useValue: { uploadPdf: async () => ({ ok: true }) } },
       ],
     }).compileComponents();
   });

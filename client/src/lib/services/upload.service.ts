@@ -13,7 +13,7 @@ const tracer = trace.getTracer('storybook-upload');
 
 @Injectable({ providedIn: 'root' })
 export class UploadService {
-  private readonly client = new UploadClient(inject(SERVER_URL) + '/parser', null, {
+  private readonly client = new UploadClient(inject(SERVER_URL) + '/api', null, {
     unaryInterceptors: [createTraceUnaryInterceptor()],
   });
 

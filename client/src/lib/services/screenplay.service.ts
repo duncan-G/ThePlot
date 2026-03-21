@@ -54,7 +54,7 @@ const tracer = trace.getTracer('storybook-screenplay');
 
 @Injectable({ providedIn: 'root' })
 export class ScreenplayService {
-  private readonly client = new ScreenplayServiceClient(inject(SERVER_URL) + '/parser', null, {
+  private readonly client = new ScreenplayServiceClient(inject(SERVER_URL) + '/api', null, {
     unaryInterceptors: [createTraceUnaryInterceptor()],
   });
 
