@@ -5,31 +5,15 @@ using Microsoft.Extensions.Hosting;
 using ThePlot.Infrastructure;
 using ThePlot.Database;
 
-using var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices((context, services) =>
-    {
-        var connectionString = context.Configuration["ConnectionStrings:theplot-db"]
-            ?? context.Configuration.GetSection("Database")["ConnectionString"]
-            ?? throw new InvalidOperationException(
-                "Connection string not configured. Set ConnectionStrings__theplot-db (Aspire) or Database:ConnectionString (appsettings).");
-        var commandTimeout = context.Configuration.GetValue("Database:CommandTimeout", 30);
+var builder = Host.CreateApplicationBuilder(args);
 
-        services.AddCoreDatabaseServices<ThePlotContext>(options =>
-        {
-            context.Configuration.GetSection("Database").Bind(options);
-            if (!string.IsNullOrEmpty(connectionString))
-            {
-                typeof(ThePlot.Database.DatabaseOptions).GetProperty("ConnectionString")!
-                    .SetValue(options, connectionString);
-            }
-            if (commandTimeout > 0)
-            {
-                typeof(ThePlot.Database.DatabaseOptions).GetProperty("CommandTimeout")!
-                    .SetValue(options, commandTimeout);
-            }
-        });
-    })
-    .Build();
+builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
+builder.Services.AddCoreDatabaseServices<ThePlotContext>(options =>
+{
+    builder.Configuration.GetSection("Database").Bind(options);
+});
+
+using var host = builder.Build();
 
 var rebuild = args.Contains("--rebuild-schema", StringComparer.OrdinalIgnoreCase);
 

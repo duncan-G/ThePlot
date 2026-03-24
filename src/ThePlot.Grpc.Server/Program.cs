@@ -6,14 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
-builder.AddAzureBlobServiceClient("pdf-storage");
-
+// Aspire's blob service health check lists containers (account scope); pdf-storage is container-scoped.
+builder.AddAzureBlobServiceClient("pdf-storage", settings => settings.DisableHealthChecks = true);
+builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
 builder.Services.AddDatabaseServices(options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
-    var connectionString = builder.Configuration.GetConnectionString("theplot-db")
-        ?? throw new ArgumentException("Database connection string is invalid.");
-    options.ConnectionString = connectionString;
 });
 
 builder.Services.AddSingleton<ImportStatusEventBus>();

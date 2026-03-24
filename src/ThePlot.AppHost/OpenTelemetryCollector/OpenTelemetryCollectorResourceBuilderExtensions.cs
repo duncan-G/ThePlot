@@ -20,9 +20,15 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
             .AddResource(collectorResource)
             .WithImage("placeholder") // Replaced when the image is built from the Dockerfile (same as AddDockerfile).
             .WithDockerfile(OtelConfigPath)
-            .WithEndpoint(targetPort: OtlpGrpcContainerPort, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: scheme)
+            .WithEndpoint(
+                targetPort: OtlpGrpcContainerPort,
+                name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName,
+                scheme: scheme)
             .WithEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, e => e.Transport = "http2")
-            .WithEndpoint(targetPort: OtlpHttpContainerPort, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: scheme)
+            .WithEndpoint(
+                targetPort: OtlpHttpContainerPort,
+                name: OpenTelemetryCollectorResource.OtlpHttpEndpointName,
+                scheme: scheme)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithEnvironment("ASPIRE_API_KEY", otlpApiKey)

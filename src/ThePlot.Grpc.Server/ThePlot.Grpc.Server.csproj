@@ -22,7 +22,9 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" Version="13.2.0" />
+    <PackageReference Include="Aspire.Azure.Npgsql" Version="13.2.0" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.0" />
+    <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" Version="13.2.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
     <PackageReference Include="Grpc.AspNetCore.HealthChecks" Version="2.76.0" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.76.0" />

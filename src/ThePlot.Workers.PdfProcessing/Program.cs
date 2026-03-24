@@ -8,13 +8,10 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
 builder.AddAzureBlobServiceClient("blobs");
-
+builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
 builder.Services.AddDatabaseServices(options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
-    var connectionString = builder.Configuration.GetConnectionString("theplot-db")
-        ?? throw new ArgumentException("Database connection string is invalid.");
-    options.ConnectionString = connectionString;
 });
 
 builder.Services.AddScoped<ScreenplayPersistenceService>();

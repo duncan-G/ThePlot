@@ -53,7 +53,7 @@ var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service"
     .WithReference(otelCollector)
     .WithReference(postgresDb)
     .WithReference(pdfBlobs, "pdf-storage")
-    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDelegator)
+    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor, StorageBuiltInRole.StorageBlobDelegator)
     .WithReference(serviceBus)
     .WaitFor(postgresDb)
     .WaitFor(schemaMigrations)
@@ -130,11 +130,15 @@ if (builder.ExecutionContext.IsPublishMode)
         var blobService = new BlobService("blobService") { Parent = storageAccount };
         x.Add(blobService);
 
+        var clientHost = clientEndpoint.Property(EndpointProperty.Host);
+        var clientOrigin = ReferenceExpression.Create($"https://{clientHost}");
+        var clientOriginParameter = clientOrigin.AsProvisioningParameter(x, "blobCorsClientOrigin");
+
         blobService.CorsRules.Add(new BicepValue<StorageCorsRule>(new StorageCorsRule
         {
             AllowedOrigins =
             [
-                new BicepValue<string>($"{clientEndpoint}"),
+                clientOriginParameter,
             ],
             AllowedMethods = [CorsRuleAllowedMethod.Get, CorsRuleAllowedMethod.Put, CorsRuleAllowedMethod.Options],
             AllowedHeaders = [new BicepValue<string>("*")],

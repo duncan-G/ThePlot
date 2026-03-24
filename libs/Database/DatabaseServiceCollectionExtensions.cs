@@ -1,12 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Database;
 
 public static class DatabaseServiceCollectionExtensions
 {
+    private static readonly string[] LocalHosts = ["localhost", "127.0.0.1", "::1"];
+
     public static IServiceCollection AddQueryFactory<TEntity, TQuery, TQueryImplementation>(this IServiceCollection services)
         where TQuery : IQuery<TEntity>
         where TQueryImplementation : class, TQuery
@@ -24,8 +28,9 @@ public static class DatabaseServiceCollectionExtensions
             .AddDbContext<TContext>((sp, options) =>
             {
                 var dbOptions = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+                var dataSource = sp.GetRequiredService<NpgsqlDataSource>();
                 options.UseNpgsql(
-                        dbOptions.ConnectionString,
+                        dataSource,
                         npgsqlOptions => npgsqlOptions.UseVector().CommandTimeout(dbOptions.CommandTimeout))
                     .UseSnakeCaseNamingConvention();
             })

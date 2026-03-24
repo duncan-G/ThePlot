@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using ThePlot.Core.Characters;
 using ThePlot.Core.Locations;
 using ThePlot.Core.SceneElements;
@@ -20,6 +21,9 @@ namespace ThePlot.Infrastructure;
 
 public static class DatabaseExtensions
 {
+    public static void ConfigureVectorTypes(this NpgsqlDataSourceBuilder builder) =>
+        builder.UseVector();
+
     public static IServiceCollection AddDatabaseServices(
         this IServiceCollection services,
         Action<DatabaseOptions> configureOptions)

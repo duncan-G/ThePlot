@@ -61,14 +61,16 @@ public static class EnvoyProxyResourceBuilderExtensions
             return envoy;
         }
         
-        if (applicationBuilder.ExecutionContext.IsPublishMode)
-        {
-            envoy.WithEnvironment($"{name}_PORT", "443");
-        }
-        else
-        {
-            envoy.WithEnvironment($"{name}_PORT", endpoint.Property(EndpointProperty.TargetPort));
-        }
+        envoy.WithEnvironment($"{name}_PORT", endpoint.Property(EndpointProperty.Port));
+
+        // if (applicationBuilder.ExecutionContext.IsPublishMode)
+        // {
+        //     envoy.WithEnvironment($"{name}_PORT", "443");
+        // }
+        // else
+        // {
+        //     envoy.WithEnvironment($"{name}_PORT", endpoint.Property(EndpointProperty.TargetPort));
+        // }
 
         return envoy;
     }

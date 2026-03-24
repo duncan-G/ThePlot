@@ -1,4 +1,3 @@
-using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.Configuration;
@@ -20,18 +19,11 @@ builder.Services.Configure<WorkerOptions>(o =>
     o.Capabilities["Worker.OTel.Enabled"] = bool.TrueString;
 });
 
-builder.Services.AddSingleton(sp =>
-{
-    var connectionString = builder.Configuration.GetConnectionString("messaging") ?? builder.Configuration["messaging"]
-        ?? throw new InvalidOperationException("Service Bus connection string 'messaging' not found.");
-    return new ServiceBusClient(connectionString);
-});
-
+builder.AddAzureServiceBusClient("messaging");
+builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
 builder.Services.AddDatabaseServices(options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
-    options.ConnectionString = builder.Configuration.GetConnectionString("theplot-db")
-        ?? throw new InvalidOperationException("Database connection string 'theplot-db' not found.");
 });
 
 builder.Services.AddOpenTelemetry()
