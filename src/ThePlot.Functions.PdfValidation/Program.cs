@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ThePlot.Functions.PdfValidation;
 using ThePlot.Infrastructure;
-using Ultra.ServiceDefaults;
+using ThePlot.ServiceDefaults;
 
 // Aspire + isolated worker: use IHostApplicationBuilder (FunctionsApplication.CreateBuilder).
 // HostBuilder + ConfigureFunctionsWorkerDefaults can cause host/worker mismatch and duplicate function loads.

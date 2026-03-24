@@ -1,6 +1,6 @@
 using Grpc.Core;
 
-namespace Ultra.Exceptions;
+namespace ThePlot.Exceptions;
 
 public sealed record GrpcErrorDescriptor(
     StatusCode StatusCode,

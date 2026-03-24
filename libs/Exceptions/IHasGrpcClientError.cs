@@ -1,4 +1,4 @@
-namespace Ultra.Exceptions;
+namespace ThePlot.Exceptions;
 
 public interface IHasGrpcClientError
 {

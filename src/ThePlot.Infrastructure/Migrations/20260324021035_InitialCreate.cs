@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Pgvector;
 
 #nullable disable
 
-namespace Ultra.ThePlot.Infrastructure.Migrations
+namespace ThePlot.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration

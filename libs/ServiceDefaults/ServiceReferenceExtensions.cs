@@ -2,7 +2,7 @@ using Grpc.Health.V1;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace Ultra.ServiceDefaults;
+namespace ThePlot.ServiceDefaults;
 
 public static class ServiceReferenceExtensions
 {

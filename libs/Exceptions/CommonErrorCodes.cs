@@ -1,4 +1,4 @@
-namespace Ultra.Exceptions;
+namespace ThePlot.Exceptions;
 
 public sealed partial class ErrorCodes
 {

@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Ultra.ThePlot.Workers.PdfProcessing</RootNamespace>
+    <RootNamespace>ThePlot.Workers.PdfProcessing</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

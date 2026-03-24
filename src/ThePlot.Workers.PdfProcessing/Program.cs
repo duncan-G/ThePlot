@@ -1,7 +1,7 @@
 using OpenTelemetry.Trace;
 using ThePlot.Infrastructure;
 using ThePlot.Workers.PdfProcessing;
-using Ultra.ServiceDefaults;
+using ThePlot.ServiceDefaults;
 
 var builder = Host.CreateApplicationBuilder(args);
 

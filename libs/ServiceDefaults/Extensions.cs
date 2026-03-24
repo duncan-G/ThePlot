@@ -9,7 +9,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-namespace Ultra.ServiceDefaults;
+namespace ThePlot.ServiceDefaults;
 
 public static class Extensions
 {

@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>Ultra.ServiceDefaults</RootNamespace>
+    <RootNamespace>ThePlot.ServiceDefaults</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

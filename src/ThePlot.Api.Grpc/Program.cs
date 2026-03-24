@@ -1,6 +1,6 @@
 using ThePlot.Infrastructure;
 using ThePlot.Api.Grpc.Services;
-using Ultra.ServiceDefaults;
+using ThePlot.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
