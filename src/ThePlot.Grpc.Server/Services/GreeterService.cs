@@ -1,6 +1,6 @@
 using Grpc.Core;
 
-namespace ThePlot.Api.Grpc.Services;
+namespace ThePlot.Grpc.Server.Services;
 
 public class GreeterService(ILogger<GreeterService> logger) : Greeter.GreeterBase
 {

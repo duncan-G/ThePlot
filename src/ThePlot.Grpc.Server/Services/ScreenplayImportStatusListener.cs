@@ -5,7 +5,7 @@ using Microsoft.Extensions.Hosting;
 using ThePlot.Core.ScreenplayImports;
 using ThePlot.Database.Abstractions;
 
-namespace ThePlot.Api.Grpc.Services;
+namespace ThePlot.Grpc.Server.Services;
 
 /// <summary>
 /// Listens to screenplay-import-status queue, persists status to DB,

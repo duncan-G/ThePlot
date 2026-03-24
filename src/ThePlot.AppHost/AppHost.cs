@@ -47,7 +47,7 @@ serviceBus.AddServiceBusQueue("pdf-processing-priority");
 serviceBus.AddServiceBusQueue("pdf-processing-standard");
 serviceBus.AddServiceBusQueue("screenplay-import-status");
 
-var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("grpc-service")
+var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service")
     .WithHttpEndpoint(name: "grpc")
     .WithEndpoint("grpc", e => e.Transport = "http2")
     .WithReference(otelCollector)
@@ -96,6 +96,8 @@ builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worke
     .WaitFor(otelCollector);
 
 var envoyProxy = builder.AddEnvoyProxy("envoy-proxy")
+    .WithReference(otelCollector)
+    .WithReference(grpcServer)
     .WaitFor(grpcServer)
     .WaitFor(otelCollector);
 

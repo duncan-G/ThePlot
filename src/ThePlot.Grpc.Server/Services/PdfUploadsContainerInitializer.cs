@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 
-namespace ThePlot.Api.Grpc.Services;
+namespace ThePlot.Grpc.Server.Services;
 
 internal sealed class PdfUploadsContainerInitializer(
     ILogger<PdfUploadsContainerInitializer> logger,

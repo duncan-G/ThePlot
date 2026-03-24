@@ -10,7 +10,7 @@ using ScreenplayEntity = ThePlot.Core.Screenplays.Screenplay;
 using ThePlot.Infrastructure;
 using ThePlot.Database.Abstractions;
 
-namespace ThePlot.Api.Grpc.Services;
+namespace ThePlot.Grpc.Server.Services;
 
 public sealed class ScreenplayGrpcService(
     ILogger<ScreenplayGrpcService> logger,

@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ThePlot.Api.Grpc\ThePlot.Api.Grpc.csproj" />
+    <ProjectReference Include="..\ThePlot.Grpc.Server\ThePlot.Grpc.Server.csproj" />
     <ProjectReference Include="..\ThePlot.Functions.PdfValidation\ThePlot.Functions.PdfValidation.csproj" />
     <ProjectReference Include="..\ThePlot.SchemaMigrations\ThePlot.SchemaMigrations.csproj" />
     <ProjectReference Include="..\ThePlot.Workers.PdfProcessing\ThePlot.Workers.PdfProcessing.csproj" />

@@ -5,7 +5,7 @@ VisualStudioVersion = 17.8.0.0
 MinimumVisualStudioVersion = 17.8.0.0
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThePlot.AppHost", "src\ThePlot.AppHost\ThePlot.AppHost.csproj", "{2344B7AE-2682-421D-A266-ED107B8368CE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThePlot.Api.Grpc", "src\ThePlot.Api.Grpc\ThePlot.Api.Grpc.csproj", "{044409B0-C628-4EE7-8FF4-820D8D12B270}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThePlot.Grpc.Server", "src\ThePlot.Grpc.Server\ThePlot.Grpc.Server.csproj", "{044409B0-C628-4EE7-8FF4-820D8D12B270}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ThePlot.Core", "src\ThePlot.Core\ThePlot.Core.csproj", "{D1E2F3A4-B5C6-4D7E-8F9A-0B1C2D3E4F5A}"
 EndProject

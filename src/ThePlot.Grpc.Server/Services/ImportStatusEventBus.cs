@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace ThePlot.Api.Grpc.Services;
+namespace ThePlot.Grpc.Server.Services;
 
 /// <summary>
 /// In-memory fan-out bus for import status events. Subscribers register by blob name

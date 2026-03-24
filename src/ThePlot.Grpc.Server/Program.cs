@@ -1,5 +1,5 @@
 using ThePlot.Infrastructure;
-using ThePlot.Api.Grpc.Services;
+using ThePlot.Grpc.Server.Services;
 using ThePlot.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);

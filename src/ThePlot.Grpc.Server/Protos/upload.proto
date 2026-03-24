@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option csharp_namespace = "ThePlot.Api.Grpc";
+option csharp_namespace = "ThePlot.Grpc.Server";
 
 package upload;
 

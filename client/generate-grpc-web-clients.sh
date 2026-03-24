@@ -9,9 +9,9 @@ cd "$REPO_ROOT"
 mkdir -p client/src/lib/services
 
 # gRPC-Web client generation
-bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Api.Grpc/Protos/greet.proto -o client/src/lib/services
-bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Api.Grpc/Protos/upload.proto -o client/src/lib/services
-bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Api.Grpc/Protos/screenplay.proto -o client/src/lib/services
+bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Grpc.Server/Protos/greet.proto -o client/src/lib/services
+bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Grpc.Server/Protos/upload.proto -o client/src/lib/services
+bash "$PROTOC_GEN/gen-grpc-web.sh" -i src/ThePlot.Grpc.Server/Protos/screenplay.proto -o client/src/lib/services
 
 # Error codes from C# to TypeScript
 node "$PROTOC_GEN/generate_error_codes.js"
