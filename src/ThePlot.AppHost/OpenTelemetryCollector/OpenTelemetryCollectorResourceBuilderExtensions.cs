@@ -1,78 +1,37 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace ThePlot.AppHost.OpenTelemetryCollector;
 
 public static class OpenTelemetryCollectorResourceBuilderExtensions
 {
-    private const string OtelExporterOtlpEndpoint = "OTEL_EXPORTER_OTLP_ENDPOINT";
-    private const string DashboardOtlpUrlVariableName = "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL";
     private const string DashboardOtlpApiKeyVariableName = "AppHost:OtlpApiKey";
-    private const string DashboardOtlpUrlDefaultValue = "http://localhost:18889";
     private const string OtelConfigPath = "../otel-collector";
     private const int OtlpGrpcContainerPort = 4317;
     private const int OtlpHttpContainerPort = 4318;
 
     public static IResourceBuilder<OpenTelemetryCollectorResource> AddOpenTelemetryCollector(this IDistributedApplicationBuilder builder, string name)
     {
-        var url = builder.Configuration[DashboardOtlpUrlVariableName] ?? DashboardOtlpUrlDefaultValue;
-        var isHttpsEnabled = url.StartsWith("https", StringComparison.OrdinalIgnoreCase);
+        var scheme = builder.Environment.IsDevelopment() ? "https" : "http";
+        var otlpApiKey = builder.Configuration[DashboardOtlpApiKeyVariableName] ?? string.Empty;
 
-        var dashboardOtlpEndpoint = new HostUrl(url);
         var collectorResource = new OpenTelemetryCollectorResource(name);
 
         var resourceBuilder = builder
             .AddResource(collectorResource)
             .WithImage("placeholder") // Replaced when the image is built from the Dockerfile (same as AddDockerfile).
             .WithDockerfile(OtelConfigPath)
-            .WithEndpoint(targetPort: OtlpGrpcContainerPort, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: "http")
-            .WithEndpoint(targetPort: OtlpHttpContainerPort, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: "http")
+            .WithEndpoint(targetPort: OtlpGrpcContainerPort, name: OpenTelemetryCollectorResource.OtlpGrpcEndpointName, scheme: scheme)
+            .WithEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, e => e.Transport = "http2")
+            .WithEndpoint(targetPort: OtlpHttpContainerPort, name: OpenTelemetryCollectorResource.OtlpHttpEndpointName, scheme: scheme)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
-            .WithEnvironment("ASPIRE_ENDPOINT", $"{dashboardOtlpEndpoint}")
-            .WithEnvironment("ASPIRE_API_KEY", builder.Configuration[DashboardOtlpApiKeyVariableName])
-            .WithEnvironment("ASPIRE_INSECURE", isHttpsEnabled ? "false" : "true")
+            .WithEnvironment("ASPIRE_API_KEY", otlpApiKey)
+            // OTLP/gRPC to the Aspire dashboard is plaintext (local URL and ACA k8se-otel:4317). Do not tie
+            // this to the collector's ingress scheme — TLS to a plaintext server yields "first record does not look like a TLS handshake".
+            .WithEnvironment("ASPIRE_INSECURE", "true")
             .WithEnvironment("OTLP_GRPC_PORT", OtlpGrpcContainerPort.ToString())
-            .WithEnvironment("OTLP_HTTP_PORT", OtlpHttpContainerPort.ToString());
-
-        builder.Eventing.Subscribe<BeforeStartEvent>((e, ct) =>
-        {
-            var logger = e.Services.GetRequiredService<ILogger<OpenTelemetryCollectorResource>>();
-            var appModel = e.Services.GetRequiredService<DistributedApplicationModel>();
-            var collector = appModel.Resources.OfType<OpenTelemetryCollectorResource>().FirstOrDefault(r => r.Name == name);
-            if (collector is null)
-            {
-                return Task.CompletedTask;
-            }
-
-            var endpoint = collector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName);
-            if (!endpoint.Exists)
-            {
-                logger.LogWarning("No {EndpointName} endpoint for the collector.", OpenTelemetryCollectorResource.OtlpGrpcEndpointName);
-                return Task.CompletedTask;
-            }
-
-            // Update all resources to forward telemetry to the collector.
-            foreach (var resource in appModel.Resources)
-            {
-                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-                {
-                    if (context.EnvironmentVariables.ContainsKey(OtelExporterOtlpEndpoint))
-                    {
-                        logger.LogDebug("Forwarding telemetry for {ResourceName} to the collector.", resource.Name);
-                        context.EnvironmentVariables[OtelExporterOtlpEndpoint] = endpoint;
-                    }
-                }));
-            }
-
-            return Task.CompletedTask;
-        });
-
-        if (isHttpsEnabled && builder.ExecutionContext.IsRunMode && builder.Environment.IsDevelopment())
-        {
-            resourceBuilder.WithArgs("--config=/etc/otelcol-contrib/config.yaml");
-        }
+            .WithEnvironment("OTLP_HTTP_PORT", OtlpHttpContainerPort.ToString())
+            .WithOtlpExporter();
 
         return resourceBuilder;
     }

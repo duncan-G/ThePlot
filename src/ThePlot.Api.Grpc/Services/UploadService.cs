@@ -1,4 +1,3 @@
-using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
 using Grpc.Core;
@@ -7,24 +6,14 @@ namespace ThePlot.Api.Grpc.Services;
 
 public class UploadService(
     ILogger<UploadService> logger,
-    IConfiguration configuration) : Upload.UploadBase
+    BlobServiceClient blobServiceClient) : Upload.UploadBase
 {
     private const int SasExpirySeconds = 90;
     private const string UploadsContainerName = "pdf-uploads";
 
     public override async Task<UploadTokenResponse> RequestUploadToken(UploadTokenRequest request, ServerCallContext context)
     {
-        var connectionString = configuration["ConnectionStrings:pdf-storage"]
-            ?? configuration["Azure:Storage:ConnectionString"]
-            ?? throw new InvalidOperationException(
-                "Azure Storage connection string not configured. Set ConnectionStrings__pdf-storage (Aspire) or Azure:Storage:ConnectionString.");
-
-        var containerClient = new BlobContainerClient(connectionString, UploadsContainerName);
-        if (!containerClient.CanGenerateSasUri)
-        {
-            throw new RpcException(new Status(StatusCode.Internal,
-                "Storage account does not support SAS token generation (ensure shared key auth)."));
-        }
+        var containerClient = blobServiceClient.GetBlobContainerClient(UploadsContainerName);
 
         var blobName = string.IsNullOrWhiteSpace(request.Filename)
             ? $"upload-{Guid.NewGuid():N}.pdf"
@@ -41,15 +30,32 @@ public class UploadService(
         };
         sasBuilder.SetPermissions(BlobSasPermissions.Create | BlobSasPermissions.Write);
 
-        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+        Uri sasUri;
+        if (blobClient.CanGenerateSasUri)
+        {
+            sasUri = blobClient.GenerateSasUri(sasBuilder);
+        }
+        else
+        {
+            // Managed identity auth — use User Delegation SAS
+            var userDelegationKey = await blobServiceClient.GetUserDelegationKeyAsync(
+                DateTimeOffset.UtcNow.AddMinutes(-5),
+                DateTimeOffset.UtcNow.AddSeconds(SasExpirySeconds));
+
+            var blobUriBuilder = new BlobUriBuilder(blobClient.Uri)
+            {
+                Sas = sasBuilder.ToSasQueryParameters(userDelegationKey, blobServiceClient.AccountName)
+            };
+            sasUri = blobUriBuilder.ToUri();
+        }
 
         logger.LogInformation("Generated upload SAS for blob {BlobName}, expires in {Seconds}s", blobName, SasExpirySeconds);
 
-        return await Task.FromResult(new UploadTokenResponse
+        return new UploadTokenResponse
         {
             UploadUrl = sasUri.ToString(),
             BlobName = blobName
-        });
+        };
     }
 
     private static string SanitizeBlobName(string filename)

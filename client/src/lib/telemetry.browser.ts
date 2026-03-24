@@ -28,7 +28,7 @@ export function initBrowserTelemetry(otelEndpoint: string): void {
   }
 
   const resource = resourceFromAttributes({
-    'service.name': 'storybook-client',
+    'service.name': 'theplot-client',
     'service.version': typeof navigator !== 'undefined' ? 'browser' : 'unknown',
   });
 

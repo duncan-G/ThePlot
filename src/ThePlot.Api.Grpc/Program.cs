@@ -1,10 +1,12 @@
 using ThePlot.Infrastructure;
 using ThePlot.Api.Grpc.Services;
+using Ultra.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
+builder.AddAzureBlobServiceClient("pdf-storage");
 
 builder.Services.AddDatabaseServices(options =>
 {

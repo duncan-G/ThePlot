@@ -3,7 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 
 export type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'storybook-theme';
+const STORAGE_KEY = 'theplot-theme';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {

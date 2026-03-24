@@ -2,23 +2,22 @@ using System.Diagnostics;
 
 namespace ThePlot.AppHost.Postgres;
 
-internal static class SchemaBuilderCommands
+internal static class SchemaMigrationsCommands
 {
     public static async Task<ExecuteCommandResult> ExecuteRebuildSchemaAsync(
         ExecuteCommandContext context,
-        string schemaBuilderDir,
+        string schemaMigrationsDir,
         IResourceWithConnectionString postgresDb)
     {
         var connectionString = await postgresDb
             .GetConnectionStringAsync(context.CancellationToken)
             ?? throw new InvalidOperationException("Connection string theplot-db not found. Ensure the application is running.");
 
-        // Build the schema builder project
         var buildInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
             Arguments = "build",
-            WorkingDirectory = schemaBuilderDir,
+            WorkingDirectory = schemaMigrationsDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -41,12 +40,11 @@ internal static class SchemaBuilderCommands
             return CommandResults.Failure($"Build failed with exit code {buildProcess.ExitCode}: {stderr}");
         }
 
-        // Run the schema builder project
         var runInfo = new ProcessStartInfo
         {
             FileName = "dotnet",
             Arguments = "run --no-build --rebuild-schema",
-            WorkingDirectory = schemaBuilderDir,
+            WorkingDirectory = schemaMigrationsDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -59,7 +57,7 @@ internal static class SchemaBuilderCommands
         var runProcess = Process.Start(runInfo);
         if (runProcess is null)
         {
-            return CommandResults.Failure("Failed to start schema builder process.");
+            return CommandResults.Failure("Failed to start schema migrations process.");
         }
 
         await runProcess.WaitForExitAsync(context.CancellationToken);

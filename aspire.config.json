@@ -1,0 +1,10 @@
+{
+  "appHost": {
+    "path": "src/ThePlot.AppHost/ThePlot.AppHost.csproj",
+    "language": "csharp/dotnet"
+  },
+  "sdk": {
+    "version": "13.2.0"
+  },
+  "channel": "stable"
+}

@@ -43,6 +43,29 @@ sed -e "/^__CORS_ALLOW_ORIGIN_MATCHES__$/r /tmp/cors-allow-origins.yaml" \
     -e "/^__CORS_ALLOW_ORIGIN_MATCHES__$/d" \
     /etc/envoy/envoy.yaml.tmpl > /tmp/envoy.yaml.tmpl
 
+# ACA internal OTLP gRPC ingress is TLS on :443; local Aspire uses cleartext h2c on the OTLP port.
+OTEL_GRPC_TLS_BLOCK_FILE=/tmp/otel_grpc_tls_block.yaml
+if [ "$OTEL_GRPC_PORT" = "443" ]; then
+  cat > "$OTEL_GRPC_TLS_BLOCK_FILE" <<EOF
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          sni: ${OTEL_GRPC_HOST}
+          common_tls_context:
+            alpn_protocols: [ "h2" ]
+            validation_context:
+              trust_chain_verification: ACCEPT_UNTRUSTED
+EOF
+else
+  : > "$OTEL_GRPC_TLS_BLOCK_FILE"
+fi
+
+sed -e "/^__OTEL_GRPC_TLS_BLOCK__$/r ${OTEL_GRPC_TLS_BLOCK_FILE}" \
+    -e "/^__OTEL_GRPC_TLS_BLOCK__$/d" \
+    /tmp/envoy.yaml.tmpl > /tmp/envoy.yaml.tmpl2
+mv /tmp/envoy.yaml.tmpl2 /tmp/envoy.yaml.tmpl
+
 ALLOWED_HOSTS_ARRAY="[\"$(echo "$ALLOWED_HOSTS" | sed 's/,/","/g')\"]"
 
 sed \
@@ -55,5 +78,9 @@ sed \
   -e "s|__GRPC_API_HOST__|${GRPC_API_HOST}|g" \
   -e "s|__GRPC_API_PORT__|${GRPC_API_PORT}|g" \
   /tmp/envoy.yaml.tmpl > /tmp/envoy.yaml
+
+echo "----- /tmp/envoy.yaml (full generated config) -----"
+cat /tmp/envoy.yaml
+echo "----- end /tmp/envoy.yaml -----"
 
 exec envoy -c /tmp/envoy.yaml "$@"

@@ -9,7 +9,7 @@ export interface UploadResult {
   blobName: string;
 }
 
-const tracer = trace.getTracer('storybook-upload');
+const tracer = trace.getTracer('theplot-upload');
 
 @Injectable({ providedIn: 'root' })
 export class UploadService {

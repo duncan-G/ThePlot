@@ -1,4 +1,4 @@
-namespace Exceptions;
+namespace Ultra.Exceptions;
 
 public sealed partial class ErrorCodes
 {

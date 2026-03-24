@@ -1,4 +1,5 @@
 using ThePlot.Workers.PdfSplitting;
+using Ultra.ServiceDefaults;
 
 var builder = Host.CreateApplicationBuilder(args);
 

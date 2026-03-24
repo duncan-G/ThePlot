@@ -24,7 +24,7 @@ if (otelEndpoint) {
 
   const sdk = new NodeSDK({
     resource: resourceFromAttributes({
-      'service.name': 'storybook-ssr',
+      'service.name': 'theplot-ssr',
       'service.version': 'node',
     }),
     spanProcessors: [new BatchSpanProcessor(traceExporter, batchConfig)],

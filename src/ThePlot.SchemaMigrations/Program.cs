@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -39,36 +37,25 @@ try
 {
     using var scope = host.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ThePlotContext>();
-    var databaseCreator = dbContext.Database.GetService<IRelationalDatabaseCreator>();
-
-    if (!await databaseCreator.ExistsAsync())
-    {
-        Console.WriteLine("Creating database...");
-        await databaseCreator.CreateAsync();
-    }
 
     if (rebuild)
     {
         var schema = dbContext.Model.GetDefaultSchema();
-        Console.WriteLine($"Rebuild requested. Dropping and recreating schema: {schema}...");
+        Console.WriteLine($"Rebuild requested. Dropping schema: {schema}...");
 
 #pragma warning disable EF1002
         await dbContext.Database.ExecuteSqlRawAsync($@"
-            DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;
-            CREATE SCHEMA ""{schema}"";");
+            DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;");
 #pragma warning restore EF1002
-
-        await databaseCreator.CreateTablesAsync();
     }
-    
-    await dbContext.Database.EnsureCreatedAsync();
 
-
-    Console.WriteLine("Schema creation/update complete.");
+    Console.WriteLine("Applying migrations...");
+    await dbContext.Database.MigrateAsync();
+    Console.WriteLine("Migrations applied successfully.");
 }
 catch (Exception ex)
 {
-    Console.WriteLine("Schema creation failed: " + ex.Message);
+    Console.WriteLine("Migration failed: " + ex.Message);
     return 1;
 }
 return 0;

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "aspire": {
+      "type": "stdio",
+      "command": "${userHome}${/}.aspire${/}bin${/}aspire",
+      "args": ["agent", "mcp"]
+    }
+  }
+}

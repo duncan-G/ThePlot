@@ -3,30 +3,24 @@ using Azure.Provisioning.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using ThePlot.AppHost;
 using ThePlot.AppHost.ClientApp;
 using ThePlot.AppHost.EnvoyProxy;
 using ThePlot.AppHost.OpenTelemetryCollector;
 using ThePlot.AppHost.Postgres;
 
-await AzureFunctionsCoreTools.EnsureAsync();
-
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Required for role assignments (e.g. WithRoleAssignments on pdf-validation-functions).
-// PDF Validation function needs GetProperties permission (TODO: Figure out if we can remove this)
 if (builder.ExecutionContext.IsPublishMode)
 {
-    builder.AddAzureContainerAppEnvironment("theplot-aca-env")
+    builder.AddAzureContainerAppEnvironment("theplotAcaEnv")
         .WithAzdResourceNaming();
 }
 
 var otelCollector = builder.AddOpenTelemetryCollector("otel-collector");
 
 var postgresDb = builder.AddDatabase("theplot-db");
-var schemaBuilder = builder.WithSchemaBuilder<Projects.ThePlot_SchemaBuilder>(postgresDb, "theplot-schema-builder");
+var schemaMigrations = builder.WithSchemaMigrations<Projects.ThePlot_SchemaMigrations>(postgresDb, "theplot-schema-migrations");
 
 var pdfBlobStorage = builder.AddAzureStorage("pdf-storage");
 if (!builder.ExecutionContext.IsPublishMode)
@@ -55,12 +49,14 @@ serviceBus.AddServiceBusQueue("screenplay-import-status");
 
 var grpcServer = builder.AddProject<Projects.ThePlot_Api_Grpc>("grpc-service")
     .WithHttpEndpoint(name: "grpc")
+    .WithEndpoint("grpc", e => e.Transport = "http2")
     .WithReference(otelCollector)
     .WithReference(postgresDb)
     .WithReference(pdfBlobs, "pdf-storage")
+    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDelegator)
     .WithReference(serviceBus)
     .WaitFor(postgresDb)
-    .WaitFor(schemaBuilder)
+    .WaitFor(schemaMigrations)
     .WaitFor(serviceBus)
     .WaitFor(otelCollector);
 
@@ -79,11 +75,10 @@ builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-
     .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Storage", "Warning")
     .WaitFor(serviceBus)
     .WaitFor(postgresDb)
-    .WaitFor(schemaBuilder)
+    .WaitFor(schemaMigrations)
     .WaitFor(otelCollector);
 
 builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker")
-    .WithReplicas(3)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithReference(otelCollector)
@@ -91,14 +86,13 @@ builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker"
     .WaitFor(otelCollector);
 
 builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worker")
-    .WithReplicas(3)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithReference(postgresDb)
     .WithReference(otelCollector)
     .WaitFor(serviceBus)
     .WaitFor(postgresDb)
-    .WaitFor(schemaBuilder)
+    .WaitFor(schemaMigrations)
     .WaitFor(otelCollector);
 
 var envoyProxy = builder.AddEnvoyProxy("envoy-proxy")
@@ -113,19 +107,28 @@ envoyProxy
     .WithCorsOriginSubdomainRegex(builder, clientEndpoint)
     .WithAllowedHosts(builder);
 
-// Configure Envoy Proxy Clusters
+// Configure Envoy Proxy Clusters (OTEL HTTP: port from OTLP HTTP, host from OTLP gRPC for internal FQDN; published ACA uses :443 TLS)
 envoyProxy
-    .WithClusterEndpoint(builder, "OTEL_HTTP", otelCollector.GetEndpoint("http"))
-    .WithClusterEndpoint(builder, "OTEL_GRPC", grpcServer.GetEndpoint("grpc"))
+    .WithClusterEndpoint(
+        builder,
+        "OTEL_HTTP",
+        otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName))
+    .WithClusterEndpoint(
+        builder,
+        "OTEL_GRPC",
+        otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName))
     .WithClusterEndpoint(builder, "GRPC_API", grpcServer.GetEndpoint("grpc"));
 
 // Configure blob storage CORS
 if (builder.ExecutionContext.IsPublishMode)
 {
-        pdfBlobStorage.ConfigureInfrastructure(x =>
+    pdfBlobStorage.ConfigureInfrastructure(x =>
     {
-        var blobStorage = x.GetProvisionableResources().OfType<BlobService>().Single();
-        blobStorage.CorsRules.Add(new BicepValue<StorageCorsRule>(new StorageCorsRule
+        var storageAccount = x.GetProvisionableResources().OfType<StorageAccount>().Single();
+        var blobService = new BlobService("blobService") { Parent = storageAccount };
+        x.Add(blobService);
+
+        blobService.CorsRules.Add(new BicepValue<StorageCorsRule>(new StorageCorsRule
         {
             AllowedOrigins =
             [

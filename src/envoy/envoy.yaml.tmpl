@@ -4,8 +4,8 @@ admin:
     socket_address: { address: 0.0.0.0, port_value: 9901 }
 
 node:
-  id: storybook-proxy
-  cluster: storybook-proxy-cluster
+  id: theplot-proxy
+  cluster: theplot-proxy-cluster
 
 stats_sinks:
   - name: envoy.stat_sinks.open_telemetry
@@ -14,6 +14,7 @@ stats_sinks:
       grpc_service:
         envoy_grpc:
           cluster_name: otel_collector_grpc_cluster
+          authority: __OTEL_GRPC_HOST__
 
 stats_flush_interval: 5s
 
@@ -31,6 +32,10 @@ static_resources:
                 stat_prefix: ingress_http
                 use_remote_address: true
                 xff_num_trusted_hops: 1
+                # Downstream is HTTPS (e.g. ACA ingress) but api_cluster is cleartext h2c; Kestrel/gRPC
+                # rejects :scheme https on a non-TLS upstream and resets the stream.
+                scheme_header_transformation:
+                  match_upstream: true
                 route_config:
                   name: api_routes
                   virtual_hosts:
@@ -120,6 +125,7 @@ __CORS_ALLOW_ORIGIN_MATCHES__
                         grpc_service:
                           envoy_grpc:
                             cluster_name: otel_collector_grpc_cluster
+                            authority: __OTEL_GRPC_HOST__
                           timeout: 0.5s
                         log_name: "envoy-proxy"
                       body:
@@ -147,10 +153,12 @@ __CORS_ALLOW_ORIGIN_MATCHES__
                       grpc_service:
                         envoy_grpc:
                           cluster_name: otel_collector_grpc_cluster
+                          authority: __OTEL_GRPC_HOST__
                         timeout: 0.5s
   clusters:
     - name: otel_collector_http_cluster
-      type: strict_dns
+      type: logical_dns
+      dns_lookup_family: V4_ONLY
       lb_policy: round_robin
       load_assignment:
         cluster_name: otel_collector_http_cluster
@@ -163,13 +171,15 @@ __CORS_ALLOW_ORIGIN_MATCHES__
                       port_value: __OTEL_HTTP_PORT__
 
     - name: otel_collector_grpc_cluster
-      type: strict_dns
+      type: logical_dns
+      dns_lookup_family: V4_ONLY
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {}
       lb_policy: round_robin
+__OTEL_GRPC_TLS_BLOCK__
       load_assignment:
         cluster_name: otel_collector_grpc_cluster
         endpoints:

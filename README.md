@@ -257,14 +257,15 @@ flowchart TD
 
 ---
 
-## Software Requirements
+## How to start app
 
+**Software Requirements**
 - .NET 10
 - Node/npm
 - Docker
+- [Aspire CLI](https://aspire.dev/get-started/install-cli/)
 - [Azure Function Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
-### How to start app
 
 ```sh
 aspire run
@@ -272,12 +273,26 @@ aspire run
 
 In console logs, you will see a link to the Aspire dashboard. There you can access every service in the app.
 
-### Deployment
+## How to Deploy
 **Requirements**
 - Azure Subscription
-- [Azure Developer Cli](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows)
+- [Aspire Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
 
-```
+
+```sh
+# Provision and Deploy
 azd up
-azd deploy
+
+# Provision only
+azd provision
+
+# Deploy only
+azd deploy [optional] <APP_NAME>
+
+# Genenerate bicep files to make modifications to deployment
+azd infra gen
+
+# Teardown
+azd down
 ```
+

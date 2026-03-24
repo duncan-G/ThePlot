@@ -14,13 +14,16 @@ public static class ClientAppResourceBuilderExtensions
         {
             var envoyPublicHost = envoyProxy.GetEndpoint("http", KnownNetworkIdentifiers.PublicInternet).Property(EndpointProperty.Host);
             var envoyPublicUrl = ReferenceExpression.Create($"https://{envoyPublicHost}");
+            var otlpGrpcHost = otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName).Property(EndpointProperty.Host);
+            var otlpHttpPort = otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName).Property(EndpointProperty.Port);
+            var nodeOtelHttp = ReferenceExpression.Create($"http://{otlpGrpcHost}:{otlpHttpPort}");
 
             var clientApp = builder.AddDockerfile("client-app", "../../client")
                 .WithHttpEndpoint(targetPort: 4000, env: "PORT")
                 .WithExternalHttpEndpoints()
                 .WithEnvironment("SERVER_URL", envoyPublicUrl)
                 .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"https://{envoyPublicHost}/otlp/v1"))
-                .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
+                .WithEnvironment("NODE_OTLP_ENDPOINT", nodeOtelHttp)
                 .WaitFor(envoyProxy);
 
             var clientEndpoint = clientApp.GetEndpoint("http", KnownNetworkIdentifiers.PublicInternet);
@@ -39,7 +42,7 @@ public static class ClientAppResourceBuilderExtensions
             })
             .WithEnvironment("SERVER_URL", envoyProxy.GetEndpoint("http"))
             .WithEnvironment("BROWSER_OTEL_ENDPOINT", ReferenceExpression.Create($"{envoyProxy.GetEndpoint("http")}/otlp/v1"))
-            .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint("http"))
+            .WithEnvironment("NODE_OTLP_ENDPOINT", otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName))
             .WithEnvironment("NG_ALLOWED_HOSTS", "*.dev.localhost")
             .WaitFor(envoyProxy);
 

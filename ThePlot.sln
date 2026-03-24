@@ -23,7 +23,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Database", "libs\Database\D
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0C06ACD1-23FD-4B04-9DFA-11445D8D5108}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThePlot.SchemaBuilder", "src\ThePlot.SchemaBuilder\ThePlot.SchemaBuilder.csproj", "{86B1B5FC-25FA-4DC5-9473-894EE4938EED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThePlot.SchemaMigrations", "src\ThePlot.SchemaMigrations\ThePlot.SchemaMigrations.csproj", "{86B1B5FC-25FA-4DC5-9473-894EE4938EED}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThePlot.Functions.PdfValidation", "src\ThePlot.Functions.PdfValidation\ThePlot.Functions.PdfValidation.csproj", "{A7B8C9D0-E1F2-4A3B-8C5D-6E7F8A9B0C1D}"
 EndProject

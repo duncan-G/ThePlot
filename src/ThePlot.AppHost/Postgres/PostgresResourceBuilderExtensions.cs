@@ -28,24 +28,30 @@ public static class PostgresResourceBuilderExtensions
         return postgres.AddDatabase(name);
     }
 
-    public static IResourceBuilder<ProjectResource> WithSchemaBuilder<TProject>(
+    public static IResourceBuilder<ProjectResource> WithSchemaMigrations<TProject>(
         this IDistributedApplicationBuilder builder,
         IResourceBuilder<Aspire.Hosting.Azure.AzurePostgresFlexibleServerDatabaseResource>  postgresDb,
         [ResourceName] string projectName)
         where TProject : IProjectMetadata, new()
     {
-        var schemaBuilderProject = new TProject();
-        var schemaBuilder = builder.AddProject<TProject>(projectName)
+        var schemaMigrationsProject = new TProject();
+        var schemaMigrations = builder.AddProject<TProject>(projectName)
             .WithReference(postgresDb)
             .WaitFor(postgresDb);
 
-        if (!builder.ExecutionContext.IsPublishMode)
+        if (builder.ExecutionContext.IsPublishMode)
         {
-            var schemaBuilderDir = Path.GetDirectoryName(schemaBuilderProject.ProjectPath)!;
-            schemaBuilder = schemaBuilder.WithCommand( 
+#pragma warning disable ASPIREAZURE002 // PublishAsAzureContainerAppJob is experimental
+            schemaMigrations.PublishAsAzureContainerAppJob();
+#pragma warning restore ASPIREAZURE002
+        }
+        else
+        {
+            var schemaMigrationsDir = Path.GetDirectoryName(schemaMigrationsProject.ProjectPath)!;
+            schemaMigrations = schemaMigrations.WithCommand(
                 "rebuild-schema",
                 "Rebuild",
-                context => SchemaBuilderCommands.ExecuteRebuildSchemaAsync(context, schemaBuilderDir, postgresDb.Resource),
+                context => SchemaMigrationsCommands.ExecuteRebuildSchemaAsync(context, schemaMigrationsDir, postgresDb.Resource),
                 new CommandOptions
                 {
                     IconName = "ArrowClockwise",
@@ -54,6 +60,6 @@ public static class PostgresResourceBuilderExtensions
                 });
         }
 
-        return schemaBuilder;
+        return schemaMigrations;
     }
 }

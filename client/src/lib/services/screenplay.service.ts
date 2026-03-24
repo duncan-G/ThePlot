@@ -50,7 +50,7 @@ export interface ScreenplayData {
   totalPages: number;
 }
 
-const tracer = trace.getTracer('storybook-screenplay');
+const tracer = trace.getTracer('theplot-screenplay');
 
 @Injectable({ providedIn: 'root' })
 export class ScreenplayService {
