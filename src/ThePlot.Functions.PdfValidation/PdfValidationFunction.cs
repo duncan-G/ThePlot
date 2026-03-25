@@ -16,7 +16,7 @@ public class PdfValidationFunction(
     IScreenplayRepository screenplayRepository,
     IUnitOfWorkFactory unitOfWorkFactory)
 {
-    internal const string ActivitySourceName = "Ultra.PdfValidation";
+    internal const string ActivitySourceName = "ThePlot.PdfValidation";
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 

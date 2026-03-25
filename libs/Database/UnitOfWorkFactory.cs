@@ -5,7 +5,7 @@ namespace ThePlot.Database;
 
 public sealed class UnitOfWorkFactory(IDbContext dbContext) : IUnitOfWorkFactory
 {
-    private static readonly ActivitySource ActivitySource = new("Ultra.UnitOfWork");
+    private static readonly ActivitySource ActivitySource = new("ThePlot.UnitOfWork");
 
     public IUnitOfWork CreateReadOnly(string operationName)
     {

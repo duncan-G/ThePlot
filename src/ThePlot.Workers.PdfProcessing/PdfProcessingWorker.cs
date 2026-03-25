@@ -18,7 +18,7 @@ public class PdfProcessingWorker(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration) : BackgroundService
 {
-    internal const string ActivitySourceName = "Ultra.PdfProcessing";
+    internal const string ActivitySourceName = "ThePlot.PdfProcessing";
     public const string PriorityQueue = "pdf-processing-priority";
     public const string StandardQueue = "pdf-processing-standard";
 

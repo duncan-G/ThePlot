@@ -4,8 +4,6 @@ using System.Text.Json.Serialization;
 using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using MuPDF.NET;
 using OpenTelemetry.Trace;
 using ThePlot.Core.ScreenplayImports;
@@ -18,7 +16,7 @@ public class PdfSplittingWorker(
     BlobServiceClient blobServiceClient,
     IConfiguration configuration) : BackgroundService
 {
-    internal const string ActivitySourceName = "Ultra.PdfSplitting";
+    internal const string ActivitySourceName = "ThePlot.PdfSplitting";
     public const string PriorityQueue = "pdf-splitting-priority";
     public const string StandardQueue = "pdf-splitting-standard";
     public const string ProcessingPriorityQueue = "pdf-processing-priority";
