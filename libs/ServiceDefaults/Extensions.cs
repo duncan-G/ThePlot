@@ -61,6 +61,7 @@ public static class Extensions
                             !(httpContext.Request.Path.StartsWithSegments(HealthEndpointPath)
                               || httpContext.Request.Path.StartsWithSegments(AlivenessEndpointPath))
                     )
+                    .AddEntityFrameworkCoreInstrumentation()
                     .AddHttpClientInstrumentation();
             });
 
@@ -71,10 +72,12 @@ public static class Extensions
 
     private static IHostApplicationBuilder AddOpenTelemetryExporters(this IHostApplicationBuilder builder)
     {
-        if (builder.Configuration["OTEL_COLLECTOR_OTLP_GRPC"] is not {} endpoint)
+        if (builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] is not { } endpoint)
         {
+            Console.WriteLine("OTEL_EXPORTER_OTLP_ENDPOINT is not set, skipping OpenTelemetry exporters");
             return builder;
         }
+
 
         builder.Services
             .AddOpenTelemetry()

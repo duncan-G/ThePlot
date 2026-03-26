@@ -50,7 +50,7 @@ serviceBus.AddServiceBusQueue("screenplay-import-status");
 var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service")
     .WithHttpEndpoint(name: "grpc")
     .WithEndpoint("grpc", e => e.Transport = "http2")
-    .WithReference(otelCollector)
+    .WithOtlpCollectorReference(otelCollector)
     .WithReference(postgresDb)
     .WithReference(pdfBlobs, "pdf-storage")
     .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor, StorageBuiltInRole.StorageBlobDelegator)
@@ -68,7 +68,7 @@ builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-
         StorageBuiltInRole.StorageAccountContributor,
         StorageBuiltInRole.StorageQueueDataContributor,
         StorageBuiltInRole.StorageTableDataContributor)
-    .WithReference(otelCollector)
+    .WithOtlpCollectorReference(otelCollector)
     .WithReference(serviceBus)
     .WithReference(postgresDb)
     .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Core", "Warning")
@@ -81,7 +81,7 @@ builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-
 builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker")
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
-    .WithReference(otelCollector)
+    .WithOtlpCollectorReference(otelCollector)
     .WaitFor(serviceBus)
     .WaitFor(otelCollector);
 
@@ -89,7 +89,7 @@ builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worke
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithReference(postgresDb)
-    .WithReference(otelCollector)
+    .WithOtlpCollectorReference(otelCollector)
     .WaitFor(serviceBus)
     .WaitFor(postgresDb)
     .WaitFor(schemaMigrations)

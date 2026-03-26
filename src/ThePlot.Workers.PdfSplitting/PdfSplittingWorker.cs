@@ -5,7 +5,6 @@ using Azure.Messaging.ServiceBus;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using MuPDF.NET;
-using OpenTelemetry.Trace;
 using ThePlot.Core.ScreenplayImports;
 
 namespace ThePlot.Workers.PdfSplitting;
