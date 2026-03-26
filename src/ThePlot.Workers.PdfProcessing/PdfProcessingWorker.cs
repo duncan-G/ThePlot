@@ -88,6 +88,7 @@ public class PdfProcessingWorker(
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
             await ExecuteProcessingWorkflowAsync(request, activity, timeoutCts.Token);
+            await TryDeleteChunkBlobAsync(request.ChunkBlobName, args.CancellationToken);
 
             await args.CompleteMessageAsync(args.Message, args.CancellationToken);
         }
@@ -95,6 +96,7 @@ public class PdfProcessingWorker(
         {
             RecordTelemetryError(ex);
             logger.LogWarning(ex, "Chunk processing timed out for {ChunkBlob}", request?.ChunkBlobName ?? "unknown");
+            await TryDeleteChunkBlobAsync(request?.ChunkBlobName, args.CancellationToken);
             await SetChunkProcessFailedAndDeadLetterAsync(request, "Chunk processing timed out", args);
         }
         catch (Exception ex)
@@ -120,6 +122,21 @@ public class PdfProcessingWorker(
         }
 
         await args.DeadLetterMessageAsync(args.Message, "PdfProcessFailed", message, args.CancellationToken);
+    }
+
+    private async Task TryDeleteChunkBlobAsync(string? chunkBlobName, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(chunkBlobName)) return;
+        try
+        {
+            var container = blobServiceClient.GetBlobContainerClient(ChunksContainer);
+            await container.GetBlobClient(chunkBlobName).DeleteIfExistsAsync(cancellationToken: ct);
+            logger.LogInformation("Deleted chunk blob {ChunkBlob}", chunkBlobName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete chunk blob {ChunkBlob}. Lifecycle policy will clean it up.", chunkBlobName);
+        }
     }
 
     private Task HandleProcessErrorAsync(ProcessErrorEventArgs args)

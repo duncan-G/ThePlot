@@ -1,9 +1,5 @@
-using Azure.Provisioning;
 using Azure.Provisioning.Storage;
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using ThePlot.AppHost.BlobStorage;
 using ThePlot.AppHost.ClientApp;
 using ThePlot.AppHost.EnvoyProxy;
 using ThePlot.AppHost.OpenTelemetryCollector;
@@ -72,6 +68,7 @@ builder.AddProject<Projects.ThePlot_Workers_PdfValidation>("pdf-validation-worke
 
 builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker")
     .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
+    .WithReplicas(3)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor)
@@ -81,6 +78,7 @@ builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker"
 
 builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worker")
     .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
+    .WithReplicas(3)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithReference(postgresDb)
@@ -114,69 +112,6 @@ envoyProxy
         otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName))
     .WithClusterEndpoint(builder, "GRPC_API", grpcServer.GetEndpoint("grpc"));
 
-// Configure blob storage CORS
-if (builder.ExecutionContext.IsPublishMode)
-{
-    pdfBlobStorage.ConfigureInfrastructure(x =>
-    {
-        var storageAccount = x.GetProvisionableResources().OfType<StorageAccount>().Single();
-        var blobService = new BlobService("blobService") { Parent = storageAccount };
-        x.Add(blobService);
-
-        var clientHost = clientEndpoint.Property(EndpointProperty.Host);
-        var clientOrigin = ReferenceExpression.Create($"https://{clientHost}");
-        var clientOriginParameter = clientOrigin.AsProvisioningParameter(x, "blobCorsClientOrigin");
-
-        blobService.CorsRules.Add(new BicepValue<StorageCorsRule>(new StorageCorsRule
-        {
-            AllowedOrigins =
-            [
-                clientOriginParameter,
-            ],
-            AllowedMethods = [CorsRuleAllowedMethod.Get, CorsRuleAllowedMethod.Put, CorsRuleAllowedMethod.Options],
-            AllowedHeaders = [new BicepValue<string>("*")],
-            ExposedHeaders = [new BicepValue<string>("*")],
-            MaxAgeInSeconds = new BicepValue<int>(3600)
-        }));
-    });
-}
-else
-{
-    // Configure blob storage CORS at runtime for Azurite emulator (ConfigureInfrastructure only applies to Azure provisioning)
-    // See: https://github.com/dotnet/aspire/discussions/5552#discussioncomment-15239416
-    pdfBlobStorage.OnResourceReady(async (_, evt, ct) =>
-    {
-        var logger = evt.Services.GetRequiredService<ILogger<Program>>();
-        try
-        {
-            var ctx = new ValueProviderContext
-            {
-                ExecutionContext = builder.ExecutionContext,
-                Network = KnownNetworkIdentifiers.LocalhostNetwork
-            };
-            var clientOrigin = await clientEndpoint.GetValueAsync(ctx, ct);
-            var clientScheme = await clientEndpoint.Property(EndpointProperty.Scheme).GetValueAsync(ctx, ct);
-            var clientHostPort = await clientEndpoint.Property(EndpointProperty.HostAndPort).GetValueAsync(ctx, ct);
-            var blobServiceClient = new BlobServiceClient("UseDevelopmentStorage=true");
-            var response = await blobServiceClient.GetPropertiesAsync(cancellationToken: ct);
-            var properties = response.Value;
-            properties.Cors.Clear();
-            properties.Cors.Add(new BlobCorsRule
-            {
-                AllowedOrigins = $"{clientOrigin},{clientScheme}://*.{clientHostPort}",
-                AllowedMethods = "GET,PUT,OPTIONS",
-                AllowedHeaders = "*",
-                ExposedHeaders = "*",
-                MaxAgeInSeconds = 3600
-            });
-            await blobServiceClient.SetPropertiesAsync(properties, ct);
-            logger.LogInformation("Configured blob storage CORS for Azurite emulator.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to configure blob storage CORS for emulator. Direct uploads may be blocked.");
-        }
-    });
-}
+pdfBlobStorage.ConfigureCorsAndLifecycle(builder, clientEndpoint);
 
 builder.Build().Run();
