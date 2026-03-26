@@ -134,6 +134,8 @@ public class PdfSplittingWorker(
         {
             ContentType = "application/json"
         };
+        if (FormatTraceParent(Activity.Current) is { } traceparent)
+            sbMessage.ApplicationProperties["traceparent"] = traceparent;
         await sender.SendMessageAsync(sbMessage, ct);
     }
 

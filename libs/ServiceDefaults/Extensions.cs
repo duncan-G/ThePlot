@@ -15,6 +15,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+    private const string ActivitySourceName = "ThePlot.*";
 
     public static IHostApplicationBuilder AddServiceDefaults(this IHostApplicationBuilder builder)
     {
@@ -54,14 +55,13 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing
-                    .AddSource(builder.Environment.ApplicationName)
+                    .AddSource(ActivitySourceName)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Don't trace requests to the health endpoint to avoid filling the dashboard with noise
                         tracing.Filter = httpContext =>
                             !(httpContext.Request.Path.StartsWithSegments(HealthEndpointPath)
                               || httpContext.Request.Path.StartsWithSegments(AlivenessEndpointPath))
                     )
-                    .AddEntityFrameworkCoreInstrumentation()
                     .AddHttpClientInstrumentation();
             });
 

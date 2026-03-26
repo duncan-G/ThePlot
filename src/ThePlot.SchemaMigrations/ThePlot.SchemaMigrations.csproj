@@ -9,16 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Npgsql" Version="13.2.0" />
+    <ProjectReference Include="..\ThePlot.Infrastructure\ThePlot.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ThePlot.Infrastructure\ThePlot.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

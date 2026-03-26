@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Npgsql" Version="13.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\libs\Database\Database.csproj" />
     <ProjectReference Include="..\ThePlot.Core\ThePlot.Core.csproj" />
   </ItemGroup>

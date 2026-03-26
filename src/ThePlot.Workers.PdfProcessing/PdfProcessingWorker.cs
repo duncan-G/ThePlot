@@ -183,6 +183,8 @@ public class PdfProcessingWorker(
         {
             ContentType = "application/json"
         };
+        if (FormatTraceParent(Activity.Current) is { } traceparent)
+            sbMessage.ApplicationProperties["traceparent"] = traceparent;
         await sender.SendMessageAsync(sbMessage, ct);
     }
 
@@ -195,6 +197,13 @@ public class PdfProcessingWorker(
     private static string? GetTraceparent(ServiceBusReceivedMessage message)
     {
         return message.ApplicationProperties.TryGetValue("traceparent", out var value) && value is string s ? s : null;
+    }
+
+    private static string? FormatTraceParent(Activity? activity)
+    {
+        if (activity is null || activity.TraceId == default || activity.SpanId == default)
+            return null;
+        return $"00-{activity.TraceId}-{activity.SpanId}-{(byte)activity.ActivityTraceFlags:x2}";
     }
 
     private static Activity? StartTelemetryActivity(

@@ -20,17 +20,10 @@ builder.Services.Configure<WorkerOptions>(o =>
 });
 
 builder.AddAzureServiceBusClient("messaging");
-builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
-builder.Services.AddDatabaseServices(options =>
+builder.AddDatabaseServices("theplot-db", options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
 });
-
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing =>
-    {
-        tracing.AddSource(PdfValidationFunction.ActivitySourceName);
-    });
 
 var host = builder.Build();
 host.Run();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Messaging.ServiceBus;
@@ -17,8 +18,10 @@ public sealed class ScreenplayImportStatusListener(
     IServiceScopeFactory scopeFactory,
     ImportStatusEventBus eventBus) : BackgroundService
 {
+    internal const string ActivitySourceName = "ThePlot.ImportStatusListener";
     public const string QueueName = "screenplay-import-status";
 
+    private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -57,6 +60,12 @@ public sealed class ScreenplayImportStatusListener(
             var message = args.Message.Body.ToObjectFromJson<ScreenplayImportStatusMessage>(JsonOptions)
                 ?? throw new InvalidOperationException("Failed to deserialize status message");
 
+            var parentContext = GetParentActivityContext(args.Message);
+            using var activity = ActivitySource.StartActivity(
+                $"ImportStatus {message.Kind}",
+                ActivityKind.Consumer,
+                parentContext: parentContext);
+
             await using var scope = scopeFactory.CreateAsyncScope();
             await ProcessStatusMessageAsync(scope.ServiceProvider, message, args.CancellationToken);
 
@@ -67,6 +76,17 @@ public sealed class ScreenplayImportStatusListener(
             logger.LogError(ex, "Failed to process status message. Dead-lettering.");
             await args.DeadLetterMessageAsync(args.Message, "ProcessingFailed", ex.Message, args.CancellationToken);
         }
+    }
+
+    private static ActivityContext GetParentActivityContext(ServiceBusReceivedMessage message)
+    {
+        if (message.ApplicationProperties.TryGetValue("traceparent", out var value)
+            && value is string traceparent
+            && ActivityContext.TryParse(traceparent, null, out var parentContext))
+        {
+            return parentContext;
+        }
+        return default;
     }
 
     private Task HandleProcessErrorAsync(ProcessErrorEventArgs args)

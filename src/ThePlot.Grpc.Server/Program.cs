@@ -8,8 +8,7 @@ builder.AddServiceDefaults();
 builder.AddAzureServiceBusClient("messaging");
 // Aspire's blob service health check lists containers (account scope); pdf-storage is container-scoped.
 builder.AddAzureBlobServiceClient("pdf-storage", settings => settings.DisableHealthChecks = true);
-builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
-builder.Services.AddDatabaseServices(options =>
+builder.AddDatabaseServices("theplot-db", options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
 });

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using ThePlot.Core.Characters;
 using ThePlot.Core.Locations;
@@ -24,17 +25,22 @@ public static class DatabaseExtensions
     public static void ConfigureVectorTypes(this NpgsqlDataSourceBuilder builder) =>
         builder.UseVector();
 
-    public static IServiceCollection AddDatabaseServices(
-        this IServiceCollection services,
+    public static IHostApplicationBuilder AddDatabaseServices(
+        this IHostApplicationBuilder builder,
+        string aspireConnectionName,
         Action<DatabaseOptions> configureOptions)
     {
-        services.AddCoreDatabaseServices<ThePlotContext>(configureOptions);
+        builder.AddAzureNpgsqlDataSource(aspireConnectionName,
+            configureSettings: settings => settings.DisableTracing = true,
+            configureDataSourceBuilder: dsb => dsb.UseVector());
 
-        AddRepositories(services);
-        AddQueries(services);
-        AddQueryFactories(services);
+        builder.Services.AddCoreDatabaseServices<ThePlotContext>(configureOptions);
 
-        return services;
+        AddRepositories(builder.Services);
+        AddQueries(builder.Services);
+        AddQueryFactories(builder.Services);
+
+        return builder;
     }
 
     private static void AddRepositories(this IServiceCollection services)

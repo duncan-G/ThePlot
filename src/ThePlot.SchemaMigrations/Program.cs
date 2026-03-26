@@ -7,7 +7,9 @@ using ThePlot.Database;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.AddAzureNpgsqlDataSource("theplot-db", configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
+builder.AddAzureNpgsqlDataSource("theplot-db",
+    configureSettings: settings => settings.DisableTracing = true,
+    configureDataSourceBuilder: dsb => dsb.ConfigureVectorTypes());
 builder.Services.AddCoreDatabaseServices<ThePlotContext>(options =>
 {
     builder.Configuration.GetSection("Database").Bind(options);
