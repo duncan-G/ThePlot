@@ -11,10 +11,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ThePlot.Grpc.Server\ThePlot.Grpc.Server.csproj" />
-    <ProjectReference Include="..\ThePlot.Functions.PdfValidation\ThePlot.Functions.PdfValidation.csproj" />
     <ProjectReference Include="..\ThePlot.SchemaMigrations\ThePlot.SchemaMigrations.csproj" />
     <ProjectReference Include="..\ThePlot.Workers.PdfProcessing\ThePlot.Workers.PdfProcessing.csproj" />
     <ProjectReference Include="..\ThePlot.Workers.PdfSplitting\ThePlot.Workers.PdfSplitting.csproj" />
+    <ProjectReference Include="..\ThePlot.Workers.PdfValidation\ThePlot.Workers.PdfValidation.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,5 +27,6 @@
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.0" />
     <PackageReference Include="Aspire.Hosting.Azure.PostgreSQL" Version="13.2.0" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.2.0" />
+    <PackageReference Include="Azure.Provisioning.EventGrid" Version="1.1.0" />
   </ItemGroup>
 </Project>

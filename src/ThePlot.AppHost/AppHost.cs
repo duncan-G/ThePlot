@@ -60,40 +60,33 @@ var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service"
     .WaitFor(serviceBus)
     .WaitFor(otelCollector);
 
-builder.AddAzureFunctionsProject<Projects.ThePlot_Functions_PdfValidation>("pdf-validation-functions")
-    .WithHostStorage(pdfBlobStorage)
-    .WithReference(pdfBlobs)
-    .WithRoleAssignments(pdfBlobStorage,
-        StorageBuiltInRole.StorageBlobDataOwner,
-        StorageBuiltInRole.StorageAccountContributor,
-        StorageBuiltInRole.StorageQueueDataContributor,
-        StorageBuiltInRole.StorageTableDataContributor)
-    .WithOtlpCollectorReference(otelCollector)
+builder.AddProject<Projects.ThePlot_Workers_PdfValidation>("pdf-validation-worker")
+    .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
     .WithReference(serviceBus)
+    .WithReference(pdfBlobs)
+    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor)
+    .WithOtlpCollectorReference(otelCollector)
     .WithReference(postgresDb)
-    .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Core", "Warning")
-    .WithEnvironment("AzureFunctionsJobHost__logging__logLevel__Azure.Storage", "Warning")
     .WaitFor(serviceBus)
-    .WaitFor(postgresDb)
-    .WaitFor(schemaMigrations)
-    .WaitFor(otelCollector);
+    .WaitFor(grpcServer);
 
 builder.AddProject<Projects.ThePlot_Workers_PdfSplitting>("pdf-splitting-worker")
+    .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
+    .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor)
     .WithOtlpCollectorReference(otelCollector)
     .WaitFor(serviceBus)
-    .WaitFor(otelCollector);
+    .WaitFor(grpcServer);
 
 builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worker")
+    .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
     .WithReference(serviceBus)
     .WithReference(pdfBlobs)
     .WithReference(postgresDb)
     .WithOtlpCollectorReference(otelCollector)
     .WaitFor(serviceBus)
-    .WaitFor(postgresDb)
-    .WaitFor(schemaMigrations)
-    .WaitFor(otelCollector);
+    .WaitFor(grpcServer);
 
 var envoyProxy = builder.AddEnvoyProxy("envoy-proxy")
     .WithReference(otelCollector)

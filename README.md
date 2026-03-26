@@ -1,6 +1,6 @@
 # ThePlot
 
-**ThePlot** is a distributed screenplay import pipeline that ingests PDF screenplays, validates them, splits them into page chunks, parses scene structure (characters, locations, dialogue, action), and streams real-time import status to users. Built with .NET Aspire, it features a gRPC API, Angular frontend, PostgreSQL database, Azure Blob Storage, Azure Functions, and Azure Service Bus.
+**ThePlot** is a distributed screenplay import pipeline that ingests PDF screenplays, validates them, splits them into page chunks, parses scene structure (characters, locations, dialogue, action), and streams real-time import status to users. Built with .NET Aspire, it features a gRPC API, Angular frontend, PostgreSQL database, Azure Blob Storage, and Azure Service Bus.
 
 ---
 
@@ -15,15 +15,15 @@ graph TD
     Client[Angular Client]
     API[gRPC API Upload]
     Blob[Azure Blob pdf-uploads]
-    Func[Azure Function PDF Validation]
+    Val[Validation Worker]
     Splitter[Splitter Worker pages 1–10 first]
     Processor[Processor Worker parse + persist]
     Listener[Status Listener DB + EventBus]
 
     Client -- "① SAS Token Request" --> API
     Client -- "② Direct PUT (SAS URL)" --> Blob
-    Blob -- "③ Blob Trigger (Event Grid)" --> Func
-    Func -- "④ Splitter Queues" --> Splitter
+    Blob -- "③ Event Grid → Service Bus" --> Val
+    Val -- "④ Splitter Queues" --> Splitter
     Splitter -- "⑤ Processor Queues" --> Processor
     Processor -- "⑥ Status Queue" --> Listener
     Listener -- "⑦ gRPC Stream (ImportStatus)" --> Client
@@ -70,21 +70,23 @@ sequenceDiagram
 
 ---
 
-### 3. Blob → Function: Validation (Event Grid)
+### 3. Blob → Validation Worker (Event Grid → Service Bus)
 
-When a blob is created in `pdf-uploads`, Azure Blob Storage emits an event. In production, Azure Functions uses **Event Grid** to receive this event and trigger the validation function. (Locally, the Functions host uses storage polling.)
+When a blob is created in `pdf-uploads`, Azure Blob Storage emits an Event Grid event that is routed to a Service Bus queue. The validation worker consumes from this queue and validates the PDF. (Locally, the worker polls the blob container directly.)
 
 ```mermaid
 sequenceDiagram
     participant Blob as Azure Blob (pdf-uploads)
     participant EG as Event Grid (BlobCreated)
-    participant Func as PdfValidationFunction
+    participant SB as Service Bus (pdf-validation)
+    participant Worker as PdfValidationWorker
 
     Blob->>EG: Event
-    EG->>Func: HTTP Trigger
-    Note right of Func: Validates: Size ≤ 10 MB, Content-Type: application/pdf, PDF magic bytes (%PDF-)
-    Note right of Func: On pass: Create Screenplay placeholder, Enqueue pages 1–10 → priority queue
-    Note right of Func: On fail: Send ValidationFailed → status queue
+    EG->>SB: Route to queue
+    SB->>Worker: Consume message
+    Note right of Worker: Validates: Size ≤ 10 MB, Content-Type: application/pdf, PDF magic bytes (%PDF-)
+    Note right of Worker: On pass: Create Screenplay placeholder, Enqueue pages 1–10 → priority queue
+    Note right of Worker: On fail: Send ValidationFailed → status queue
 ```
 
 ---
@@ -95,13 +97,13 @@ After validation, **only pages 1–10** are enqueued to the **priority** splitte
 
 ```mermaid
 graph TD
-    Func[PdfValidationFunction]
+    Val[PdfValidationWorker]
     Q1[(pdf-splitting-priority)]
     Q2[(pdf-splitting-standard)]
     N1[First chunk only - pages 1-10]
     N2[Remaining chunks enqueued later - 11-20, 21-30, ...]
 
-    Func -- "Single message: BlobName, StartPage 1, EndPage 10, ScreenplayId" --> Q1
+    Val -- "Single message: BlobName, StartPage 1, EndPage 10, ScreenplayId" --> Q1
     Q1 -.-> N1
     Q2 -.-> N2
 ```
@@ -178,11 +180,11 @@ graph TD
 ```mermaid
 flowchart TD
     subgraph Client_Side["Client Side"]
-        Client[Angular Client port 4200]
+        Client[Angular Client]
     end
 
     subgraph API_Layer["API Layer"]
-        Envoy[gRPC API Proxy Envoy - port 11000]
+        Envoy[gRPC API Proxy Envoy]
         UploadSvc[Upload Service]
         ScreenplaySvc[Screenplay Service]
         StatusListener[Status Listener Background Service]
@@ -190,11 +192,11 @@ flowchart TD
 
     subgraph Azure_Cloud["Azure Cloud"]
         Blob[(Blob Storage pdf-uploads / pdf-chunks)]
-        Func[Validation Function]
         ASB((Azure Service Bus))
     end
 
     subgraph Workers["Workers"]
+        Val[Validation Worker]
         Splitter[Splitter Worker 3 replicas]
         Processor[Processor Worker 3 replicas]
     end
@@ -206,7 +208,7 @@ flowchart TD
     %% Force strict vertical stacking of layers
     Client ~~~ Envoy
     UploadSvc ~~~ Blob
-    ASB ~~~ Splitter
+    ASB ~~~ Val
     Processor ~~~ DB
 
     %% Network / Client Flows
@@ -219,8 +221,9 @@ flowchart TD
     StatusListener -. "Updates" .-> Envoy
 
     %% Event & Queue Flows
-    Blob -- "BlobTrigger" --> Func
-    Func -- "Queue Split" --> ASB
+    Blob -- "Event Grid → pdf-validation" --> ASB
+    ASB -- "pdf-validation" --> Val
+    Val -- "Queue Split" --> ASB
 
     ASB -- "pdf-splitting-*" --> Splitter
     Splitter -- "pdf-processing-*" --> ASB
@@ -235,7 +238,7 @@ flowchart TD
     classDef storage fill:#c9a227,stroke:#333,color:#fff;
     classDef worker fill:#1e5a8e,stroke:#333,color:#fff;
     class Blob,DB,ASB storage;
-    class Splitter,Processor worker;
+    class Val,Splitter,Processor worker;
 ```
 
 ---
@@ -247,8 +250,8 @@ flowchart TD
 | ---- | ------------------- | ------------------- | ---------------------------------------------- |
 | 1    | Client              | gRPC API            | gRPC `RequestUploadToken`                      |
 | 2    | Client              | Blob Storage        | HTTP PUT (SAS URL)                             |
-| 3    | Blob Storage        | Validation Function | Event Grid (BlobCreated)                       |
-| 4    | Validation Function | Splitter Queues     | Service Bus `pdf-splitting-priority`           |
+| 3    | Blob Storage        | Validation Worker   | Event Grid → Service Bus `pdf-validation`      |
+| 4    | Validation Worker   | Splitter Queues     | Service Bus `pdf-splitting-priority`           |
 | 5    | Splitter Worker     | Processor Queues    | Service Bus `pdf-processing-priority/standard` |
 | 6    | Processor Worker    | Status Queue        | Service Bus `screenplay-import-status`         |
 | 7    | Processor Worker    | PostgreSQL          | EF Core (scenes, characters, locations)        |
@@ -264,7 +267,6 @@ flowchart TD
 - Node/npm
 - Docker
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
-- [Azure Function Core Tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
 
 
 ```sh
