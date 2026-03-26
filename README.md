@@ -278,7 +278,7 @@ In console logs, you will see a link to the Aspire dashboard. There you can acce
 ## How to Deploy
 **Requirements**
 - Azure Subscription
-- [Aspire Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
+- [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/)
 
 
 ```sh
@@ -289,9 +289,9 @@ azd up
 azd provision
 
 # Deploy only
-azd deploy [optional] <APP_NAME>
+azd deploy [optional] <PROJECT_NAME>
 
-# Genenerate bicep files to make modifications to deployment
+# Genenerate bicep files to make infra modifications
 azd infra gen
 
 # Teardown

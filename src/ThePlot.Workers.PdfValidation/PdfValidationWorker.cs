@@ -183,13 +183,33 @@ public class PdfValidationWorker(
         var blobClient = container.GetBlobClient(blobName);
 
         Response<BlobProperties> props;
-        // Suppress instrumentation to avoid an activity being created without a parent.
-        using (SuppressInstrumentationScope.Begin())
+        ActivityContext parentContext;
+        try
         {
-            props = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
-        }
+            // Suppress instrumentation to avoid an activity being created without a parent.
+            using (SuppressInstrumentationScope.Begin())
+            {
+                props = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
+            }
 
-        var parentContext = GetParentActivityContext(props.Value.Metadata);
+            parentContext = GetParentActivityContext(props.Value.Metadata);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to retrieve blob properties for {BlobName}. Sending ImportFailed status.", blobName);
+            try
+            {
+                await SendStatusAsync(
+                    ScreenplayImportStatusMessage.ImportFailed(null, blobName, $"Import error: {ex.Message}"),
+                    cancellationToken);
+            }
+            catch (Exception statusEx)
+            {
+                logger.LogError(statusEx, "Failed to send ImportFailed status for blob {BlobName}", blobName);
+            }
+
+            throw;
+        }
 
         using var activity = ActivitySource.StartActivity(
             "Validating PDF",
@@ -199,37 +219,58 @@ public class PdfValidationWorker(
         activity?.SetTag("blob.name", blobName);
         logger.LogInformation("Validating uploaded blob {BlobName}", blobName);
 
-        await SendStatusAsync(ScreenplayImportStatusMessage.BlobUploaded(blobName), cancellationToken);
-
-        var size = props.Value.ContentLength;
-        var contentType = props.Value.ContentType ?? string.Empty;
-
-        if (size > MaxSizeBytes)
+        try
         {
-            await RejectAndDeleteAsync(blobClient, blobName, activity,
-                "size_exceeded", $"exceeds 10 MB limit ({size} bytes)", cancellationToken);
-            return;
-        }
+            await SendStatusAsync(ScreenplayImportStatusMessage.BlobUploaded(blobName), cancellationToken);
 
-        if (!contentType.Equals(PdfContentType, StringComparison.OrdinalIgnoreCase))
+            var size = props.Value.ContentLength;
+            var contentType = props.Value.ContentType ?? string.Empty;
+
+            if (size > MaxSizeBytes)
+            {
+                await RejectAndDeleteAsync(blobClient, blobName, activity,
+                    "size_exceeded", $"exceeds 10 MB limit ({size} bytes)", cancellationToken);
+                return;
+            }
+
+            if (!contentType.Equals(PdfContentType, StringComparison.OrdinalIgnoreCase))
+            {
+                await RejectAndDeleteAsync(blobClient, blobName, activity,
+                    "invalid_content_type", $"has invalid content type '{contentType}'", cancellationToken);
+                return;
+            }
+
+            if (!await HasValidPdfSignatureAsync(blobClient, cancellationToken))
+            {
+                await RejectAndDeleteAsync(blobClient, blobName, activity,
+                    "invalid_signature", "does not have valid PDF signature", cancellationToken);
+                return;
+            }
+
+            activity?.SetTag("validation.result", "passed");
+            activity?.SetTag("blob.size", size);
+            logger.LogInformation("Blob {BlobName} passed validation ({Size} bytes, PDF).", blobName, size);
+
+            await EnqueueForSplittingAsync(blobName, size, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await RejectAndDeleteAsync(blobClient, blobName, activity,
-                "invalid_content_type", $"has invalid content type '{contentType}'", cancellationToken);
-            return;
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.AddException(ex);
+            logger.LogError(ex, "Unhandled error validating blob {BlobName}. Sending ValidationFailed status.", blobName);
+            try
+            {
+                await SendStatusAsync(
+                    ScreenplayImportStatusMessage.ValidationFailed(blobName, $"Validation error: {ex.Message}"),
+                    cancellationToken);
+            }
+            catch (Exception statusEx)
+            {
+                logger.LogError(statusEx, "Failed to send ValidationFailed status for blob {BlobName}", blobName);
+            }
+
+            throw;
         }
-
-        if (!await HasValidPdfSignatureAsync(blobClient, cancellationToken))
-        {
-            await RejectAndDeleteAsync(blobClient, blobName, activity,
-                "invalid_signature", "does not have valid PDF signature", cancellationToken);
-            return;
-        }
-
-        activity?.SetTag("validation.result", "passed");
-        activity?.SetTag("blob.size", size);
-        logger.LogInformation("Blob {BlobName} passed validation ({Size} bytes, PDF).", blobName, size);
-
-        await EnqueueForSplittingAsync(blobName, size, cancellationToken);
     }
 
     private async Task EnqueueForSplittingAsync(string blobName, long blobSize, CancellationToken cancellationToken)
