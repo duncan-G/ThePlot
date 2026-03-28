@@ -9,6 +9,7 @@ import {
   GetScreenplayResponse,
   ListScreenplaysRequest,
   ListScreenplaysResponse,
+  DeleteScreenplayRequest,
   ScreenplaySummary as ScreenplaySummaryPb,
   SceneMessage,
   SceneElementMessage,
@@ -138,6 +139,12 @@ export class ScreenplayService {
 
     const response = await this.client.getScreenplay(request);
     return mapResponse(response);
+  }
+
+  async deleteScreenplay(screenplayId: string): Promise<void> {
+    const request = new DeleteScreenplayRequest();
+    request.setScreenplayId(screenplayId);
+    await this.client.deleteScreenplay(request);
   }
 }
 

@@ -13,6 +13,9 @@ service ScreenplayService {
 
   // Cursor-based paginated list of screenplays ordered by most recently created.
   rpc ListScreenplays (ListScreenplaysRequest) returns (ListScreenplaysResponse);
+
+  // Soft-delete a screenplay by ID.
+  rpc DeleteScreenplay (DeleteScreenplayRequest) returns (DeleteScreenplayResponse);
 }
 
 message StreamImportStatusRequest {
@@ -69,6 +72,12 @@ message ScreenplaySummary {
   int32 total_pages = 4;
   string date_created = 5;
 }
+
+message DeleteScreenplayRequest {
+  string screenplay_id = 1;
+}
+
+message DeleteScreenplayResponse {}
 
 message SceneElementMessage {
   string id = 1;

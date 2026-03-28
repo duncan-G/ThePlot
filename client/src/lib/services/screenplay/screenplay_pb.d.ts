@@ -246,6 +246,38 @@ export namespace ScreenplaySummary {
   }
 }
 
+export class DeleteScreenplayRequest extends jspb.Message {
+  getScreenplayId(): string;
+  setScreenplayId(value: string): DeleteScreenplayRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): DeleteScreenplayRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: DeleteScreenplayRequest): DeleteScreenplayRequest.AsObject;
+  static serializeBinaryToWriter(message: DeleteScreenplayRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): DeleteScreenplayRequest;
+  static deserializeBinaryFromReader(message: DeleteScreenplayRequest, reader: jspb.BinaryReader): DeleteScreenplayRequest;
+}
+
+export namespace DeleteScreenplayRequest {
+  export type AsObject = {
+    screenplayId: string,
+  }
+}
+
+export class DeleteScreenplayResponse extends jspb.Message {
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): DeleteScreenplayResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: DeleteScreenplayResponse): DeleteScreenplayResponse.AsObject;
+  static serializeBinaryToWriter(message: DeleteScreenplayResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): DeleteScreenplayResponse;
+  static deserializeBinaryFromReader(message: DeleteScreenplayResponse, reader: jspb.BinaryReader): DeleteScreenplayResponse;
+}
+
+export namespace DeleteScreenplayResponse {
+  export type AsObject = {
+  }
+}
+
 export class SceneElementMessage extends jspb.Message {
   getId(): string;
   setId(value: string): SceneElementMessage;

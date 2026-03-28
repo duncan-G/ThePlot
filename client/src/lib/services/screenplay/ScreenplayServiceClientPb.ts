@@ -147,5 +147,48 @@ export class ScreenplayServiceClient {
     this.methodDescriptorListScreenplays);
   }
 
+  methodDescriptorDeleteScreenplay = new grpcWeb.MethodDescriptor(
+    '/screenplay.ScreenplayService/DeleteScreenplay',
+    grpcWeb.MethodType.UNARY,
+    screenplay_pb.DeleteScreenplayRequest,
+    screenplay_pb.DeleteScreenplayResponse,
+    (request: screenplay_pb.DeleteScreenplayRequest) => {
+      return request.serializeBinary();
+    },
+    screenplay_pb.DeleteScreenplayResponse.deserializeBinary
+  );
+
+  deleteScreenplay(
+    request: screenplay_pb.DeleteScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<screenplay_pb.DeleteScreenplayResponse>;
+
+  deleteScreenplay(
+    request: screenplay_pb.DeleteScreenplayRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: screenplay_pb.DeleteScreenplayResponse) => void): grpcWeb.ClientReadableStream<screenplay_pb.DeleteScreenplayResponse>;
+
+  deleteScreenplay(
+    request: screenplay_pb.DeleteScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: screenplay_pb.DeleteScreenplayResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/screenplay.ScreenplayService/DeleteScreenplay',
+        request,
+        metadata || {},
+        this.methodDescriptorDeleteScreenplay,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/screenplay.ScreenplayService/DeleteScreenplay',
+    request,
+    metadata || {},
+    this.methodDescriptorDeleteScreenplay);
+  }
+
 }
 

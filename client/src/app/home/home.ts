@@ -9,6 +9,7 @@ import {
   ChangeDetectionStrategy,
   inject,
   PLATFORM_ID,
+  effect,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
@@ -46,14 +47,37 @@ export class Home implements OnInit, OnDestroy {
   protected readonly importPhase = signal('');
   protected readonly importing = signal(false);
   protected readonly settingsOpen = signal(false);
+  protected readonly openMenuId = signal<string | null>(null);
+  protected readonly deleteTarget = signal<ScreenplaySummary | null>(null);
+  protected readonly deleting = signal(false);
 
   protected readonly hasMore = computed(() => this.nextPageToken().length > 0);
   protected readonly hasScreenplays = computed(() => this.screenplays().length > 0);
   protected readonly showEmptyState = computed(() => !this.loading() && !this.hasScreenplays());
 
   private scrollSentinel = viewChild<ElementRef<HTMLDivElement>>('scrollSentinel');
-  private observer: IntersectionObserver | null = null;
   private statusSub: Subscription | null = null;
+
+  constructor() {
+    if (this.isBrowser) {
+      effect(onCleanup => {
+        const sentinel = this.scrollSentinel()?.nativeElement;
+        if (!sentinel) return;
+
+        const observer = new IntersectionObserver(
+          entries => {
+            if (entries[0]?.isIntersecting && this.hasMore() && !this.loadingMore()) {
+              this.loadMore();
+            }
+          },
+          { rootMargin: '200px' },
+        );
+        observer.observe(sentinel);
+
+        onCleanup(() => observer.disconnect());
+      });
+    }
+  }
 
   ngOnInit(): void {
     this.themeService.init();
@@ -63,7 +87,6 @@ export class Home implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.observer?.disconnect();
     this.statusSub?.unsubscribe();
   }
 
@@ -78,24 +101,7 @@ export class Home implements OnInit, OnDestroy {
       this.error.set(err instanceof Error ? err.message : 'Failed to load screenplays');
     } finally {
       this.loading.set(false);
-      queueMicrotask(() => this.setupIntersectionObserver());
     }
-  }
-
-  private setupIntersectionObserver(): void {
-    this.observer?.disconnect();
-    const sentinel = this.scrollSentinel()?.nativeElement;
-    if (!sentinel) return;
-
-    this.observer = new IntersectionObserver(
-      entries => {
-        if (entries[0]?.isIntersecting && this.hasMore() && !this.loadingMore()) {
-          this.loadMore();
-        }
-      },
-      { rootMargin: '200px' },
-    );
-    this.observer.observe(sentinel);
   }
 
   private async loadMore(): Promise<void> {
@@ -118,6 +124,40 @@ export class Home implements OnInit, OnDestroy {
 
   protected openScreenplay(id: string): void {
     this.router.navigate(['/screenplays', id]);
+  }
+
+  protected toggleMenu(id: string): void {
+    this.openMenuId.update(v => (v === id ? null : id));
+  }
+
+  protected closeMenu(): void {
+    this.openMenuId.set(null);
+  }
+
+  protected confirmDelete(sp: ScreenplaySummary): void {
+    this.openMenuId.set(null);
+    this.deleteTarget.set(sp);
+  }
+
+  protected cancelDelete(): void {
+    this.deleteTarget.set(null);
+  }
+
+  protected async executeDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target || this.deleting()) return;
+
+    this.deleting.set(true);
+    try {
+      await this.screenplayService.deleteScreenplay(target.id);
+      this.screenplays.update(list => list.filter(s => s.id !== target.id));
+      this.deleteTarget.set(null);
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to delete screenplay');
+      this.deleteTarget.set(null);
+    } finally {
+      this.deleting.set(false);
+    }
   }
 
   protected onDragOver(e: DragEvent): void {

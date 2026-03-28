@@ -217,6 +217,32 @@ public sealed class ScreenplayGrpcService(
         return response;
     }
 
+    public override async Task<DeleteScreenplayResponse> DeleteScreenplay(
+        DeleteScreenplayRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ScreenplayId, out var screenplayId))
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id"));
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var sp = scope.ServiceProvider;
+        var uowFactory = sp.GetRequiredService<IUnitOfWorkFactory>();
+
+        using (var uow = uowFactory.CreateReadWrite("DeleteScreenplay"))
+        {
+            var screenplayRepo = sp.GetRequiredService<ThePlot.Core.Screenplays.IScreenplayRepository>();
+            var screenplay = await screenplayRepo.GetByKeyAsync(screenplayId, context.CancellationToken)
+                ?? throw new RpcException(new Status(StatusCode.NotFound, "Screenplay not found"));
+
+            screenplay.SoftDelete();
+            await screenplayRepo.UpdateAsync(screenplay, context.CancellationToken);
+            await uow.CommitAsync(context.CancellationToken);
+        }
+
+        logger.LogInformation("Screenplay {ScreenplayId} soft-deleted", screenplayId);
+        return new DeleteScreenplayResponse();
+    }
+
     private static int GetPage(JsonDocument? pdfMetadata)
     {
         if (pdfMetadata is null) return 0;
