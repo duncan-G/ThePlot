@@ -55,6 +55,7 @@ public sealed class ParsedScene
     public string? LocationType { get; set; }
     public string Location { get; set; } = "";
     public string TimeOfDay { get; set; } = "";
+    public bool IsContinuation { get; set; }
     public List<ParsedElement> Elements { get; } = [];
 }
 

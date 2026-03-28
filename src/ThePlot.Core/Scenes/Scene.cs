@@ -34,7 +34,7 @@ public sealed class Scene : IDateStamped
         string? timeOfDay = null,
         JsonDocument? pdfMetadata = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(heading);
+        ArgumentNullException.ThrowIfNull(heading);
 
         return new Scene
         {

@@ -14,6 +14,7 @@ builder.AddDatabaseServices("theplot-db", options =>
 });
 
 builder.Services.AddSingleton<ImportStatusEventBus>();
+builder.Services.AddScoped<ChunkReconciliationService>();
 builder.Services.AddGrpc();
 builder.Services.AddGrpcReflection();
 builder.Services.AddGrpcHealthChecks();

@@ -63,7 +63,7 @@ public sealed class ScreenplayPersistenceService(
                 interiorExterior: MapLocationType(parsedScene.LocationType),
                 locationId: locationId,
                 timeOfDay: parsedScene.TimeOfDay.Length > 0 ? parsedScene.TimeOfDay : null,
-                pdfMetadata: SerializePdfMetadata(parsedScene.Page));
+                pdfMetadata: SerializeScenePdfMetadata(parsedScene.Page, parsedScene.IsContinuation));
             await sceneRepository.AddAsync(scene, ct);
 
             var sequenceOrder = 0;
@@ -156,8 +156,13 @@ public sealed class ScreenplayPersistenceService(
         _ => null
     };
 
-    private static JsonDocument SerializePdfMetadata(int page)
+    private static JsonDocument SerializeScenePdfMetadata(int page, bool continuation)
     {
+        if (continuation)
+        {
+            return JsonDocument.Parse(JsonSerializer.Serialize(
+                new { page, continuation }, JsonOptions));
+        }
         return JsonDocument.Parse(JsonSerializer.Serialize(
             new { page }, JsonOptions));
     }

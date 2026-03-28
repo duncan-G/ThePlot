@@ -117,6 +117,7 @@ public sealed partial class ScreenplayBuilder(ScreenplayConfig config)
     /// <summary>
     /// Creates a synthetic scene for elements that appear before any scene heading
     /// in a chunk. This happens when a chunk starts mid-scene.
+    /// Marked as continuation so post-processing can merge it into the predecessor.
     /// </summary>
     private void EnsureContinuationScene(int page)
     {
@@ -125,8 +126,9 @@ public sealed partial class ScreenplayBuilder(ScreenplayConfig config)
 
         _currentScene = new ParsedScene
         {
-            Heading = "CONTINUED",
+            Heading = "",
             Page = page,
+            IsContinuation = true,
         };
         _screenplay.Scenes.Add(_currentScene);
     }

@@ -204,6 +204,7 @@ public sealed class ScreenplayImportStatusListener(
                 {
                     string? sourceBlobName = null;
                     int? importTotalPages = null;
+                    bool allChunksDone = false;
                     using (var uow = uowFactory.CreateReadWrite("ChunkProcessDone"))
                     {
                         var imports = await importRepo.GetByQueryAsync(importQueryFactory.Create().ByScreenplayId(doneScreenplayId), ct);
@@ -218,7 +219,20 @@ public sealed class ScreenplayImportStatusListener(
                             .SetProperty(c => c.ProcessCompletedAt, DateTimeOffset.UtcNow), ct);
                         await uow.SaveChangesAsync(ct);
                         await uow.CommitAsync(ct);
+
+                        var allChunks = await chunkRepo.GetByQueryAsync(
+                            chunkQueryFactory.Create().ByScreenplayImportId(import.Id), ct);
+                        allChunksDone = allChunks.Count > 0
+                            && allChunks.All(c => c.ProcessStatus == ChunkStatus.Done);
                     }
+
+                    if (allChunksDone)
+                    {
+                        logger.LogInformation("All chunks processed for screenplay {ScreenplayId}, running reconciliation", doneScreenplayId);
+                        var reconciliation = services.GetRequiredService<ChunkReconciliationService>();
+                        await reconciliation.ReconcileAsync(doneScreenplayId, ct);
+                    }
+
                     logger.LogInformation("Chunk process done: screenplay {ScreenplayId}, pages from {Start}", doneScreenplayId, doneStartPage);
                     if (sourceBlobName is not null)
                         PublishEvent(sourceBlobName, msg, importTotalPages);
