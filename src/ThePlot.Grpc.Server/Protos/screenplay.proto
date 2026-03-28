@@ -10,6 +10,9 @@ service ScreenplayService {
 
   // Fetch the screenplay with scenes and elements. Use after ChunkProcessDone to get newly available data.
   rpc GetScreenplay (GetScreenplayRequest) returns (GetScreenplayResponse);
+
+  // Cursor-based paginated list of screenplays ordered by most recently created.
+  rpc ListScreenplays (ListScreenplaysRequest) returns (ListScreenplaysResponse);
 }
 
 message StreamImportStatusRequest {
@@ -47,6 +50,24 @@ message SceneMessage {
   int32 page = 6;
   repeated string characters = 7;
   repeated SceneElementMessage elements = 8;
+}
+
+message ListScreenplaysRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListScreenplaysResponse {
+  repeated ScreenplaySummary items = 1;
+  string next_page_token = 2;
+}
+
+message ScreenplaySummary {
+  string id = 1;
+  string title = 2;
+  repeated string authors = 3;
+  int32 total_pages = 4;
+  string date_created = 5;
 }
 
 message SceneElementMessage {

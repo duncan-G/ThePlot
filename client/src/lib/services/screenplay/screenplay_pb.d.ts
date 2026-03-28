@@ -164,6 +164,88 @@ export namespace SceneMessage {
   }
 }
 
+export class ListScreenplaysRequest extends jspb.Message {
+  getPageSize(): number;
+  setPageSize(value: number): ListScreenplaysRequest;
+
+  getPageToken(): string;
+  setPageToken(value: string): ListScreenplaysRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ListScreenplaysRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: ListScreenplaysRequest): ListScreenplaysRequest.AsObject;
+  static serializeBinaryToWriter(message: ListScreenplaysRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ListScreenplaysRequest;
+  static deserializeBinaryFromReader(message: ListScreenplaysRequest, reader: jspb.BinaryReader): ListScreenplaysRequest;
+}
+
+export namespace ListScreenplaysRequest {
+  export type AsObject = {
+    pageSize: number,
+    pageToken: string,
+  }
+}
+
+export class ListScreenplaysResponse extends jspb.Message {
+  getItemsList(): Array<ScreenplaySummary>;
+  setItemsList(value: Array<ScreenplaySummary>): ListScreenplaysResponse;
+  clearItemsList(): ListScreenplaysResponse;
+  addItems(value?: ScreenplaySummary, index?: number): ScreenplaySummary;
+
+  getNextPageToken(): string;
+  setNextPageToken(value: string): ListScreenplaysResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ListScreenplaysResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: ListScreenplaysResponse): ListScreenplaysResponse.AsObject;
+  static serializeBinaryToWriter(message: ListScreenplaysResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ListScreenplaysResponse;
+  static deserializeBinaryFromReader(message: ListScreenplaysResponse, reader: jspb.BinaryReader): ListScreenplaysResponse;
+}
+
+export namespace ListScreenplaysResponse {
+  export type AsObject = {
+    itemsList: Array<ScreenplaySummary.AsObject>,
+    nextPageToken: string,
+  }
+}
+
+export class ScreenplaySummary extends jspb.Message {
+  getId(): string;
+  setId(value: string): ScreenplaySummary;
+
+  getTitle(): string;
+  setTitle(value: string): ScreenplaySummary;
+
+  getAuthorsList(): Array<string>;
+  setAuthorsList(value: Array<string>): ScreenplaySummary;
+  clearAuthorsList(): ScreenplaySummary;
+  addAuthors(value: string, index?: number): ScreenplaySummary;
+
+  getTotalPages(): number;
+  setTotalPages(value: number): ScreenplaySummary;
+
+  getDateCreated(): string;
+  setDateCreated(value: string): ScreenplaySummary;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ScreenplaySummary.AsObject;
+  static toObject(includeInstance: boolean, msg: ScreenplaySummary): ScreenplaySummary.AsObject;
+  static serializeBinaryToWriter(message: ScreenplaySummary, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ScreenplaySummary;
+  static deserializeBinaryFromReader(message: ScreenplaySummary, reader: jspb.BinaryReader): ScreenplaySummary;
+}
+
+export namespace ScreenplaySummary {
+  export type AsObject = {
+    id: string,
+    title: string,
+    authorsList: Array<string>,
+    totalPages: number,
+    dateCreated: string,
+  }
+}
+
 export class SceneElementMessage extends jspb.Message {
   getId(): string;
   setId(value: string): SceneElementMessage;

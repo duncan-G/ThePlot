@@ -6,6 +6,7 @@ using ThePlot.Core.Locations;
 using ThePlot.Core.SceneElements;
 using ThePlot.Core.Scenes;
 using ThePlot.Core.ScreenplayImports;
+using ThePlot.Core.Screenplays;
 using ScreenplayEntity = ThePlot.Core.Screenplays.Screenplay;
 using ThePlot.Infrastructure;
 using ThePlot.Database.Abstractions;
@@ -50,6 +51,57 @@ public sealed class ScreenplayGrpcService(
         {
             eventBus.Unsubscribe(blobName, reader);
         }
+    }
+
+    public override async Task<ListScreenplaysResponse> ListScreenplays(
+        ListScreenplaysRequest request,
+        ServerCallContext context)
+    {
+        var pageSize = request.PageSize is > 0 and <= 50 ? request.PageSize : 20;
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var sp = scope.ServiceProvider;
+        var uowFactory = sp.GetRequiredService<IUnitOfWorkFactory>();
+        var pagingTokenHelper = sp.GetRequiredService<PagingTokenHelper>();
+
+        ScreenplayPagingToken pagingToken;
+        if (!string.IsNullOrWhiteSpace(request.PageToken))
+        {
+            pagingToken = pagingTokenHelper.Decode<ScreenplayPagingToken>(request.PageToken)
+                          ?? new ScreenplayPagingToken(null, pageSize);
+        }
+        else
+        {
+            pagingToken = new ScreenplayPagingToken(null, pageSize);
+        }
+
+        ListScreenplaysResponse response;
+        using (uowFactory.CreateReadOnly("ListScreenplays"))
+        {
+            var queryFactory = sp.GetRequiredService<IQueryFactory<ScreenplayEntity, ThePlot.Core.Screenplays.IScreenplayQuery>>();
+            var repo = sp.GetRequiredService<ThePlot.Core.Screenplays.IScreenplayRepository>();
+
+            var page = await repo.GetByQueryPagedAsync(queryFactory.Create(), pagingToken, context.CancellationToken);
+
+            response = new ListScreenplaysResponse
+            {
+                NextPageToken = page.NextPageToken ?? "",
+            };
+
+            foreach (var screenplay in page.Items)
+            {
+                response.Items.Add(new ScreenplaySummary
+                {
+                    Id = screenplay.Id.ToString(),
+                    Title = screenplay.Title,
+                    TotalPages = 0,
+                    DateCreated = screenplay.DateCreated.ToString("O"),
+                });
+                response.Items[^1].Authors.AddRange(screenplay.Authors);
+            }
+        }
+
+        return response;
     }
 
     public override async Task<GetScreenplayResponse> GetScreenplay(

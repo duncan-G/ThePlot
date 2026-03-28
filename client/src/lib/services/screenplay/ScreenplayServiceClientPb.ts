@@ -104,5 +104,48 @@ export class ScreenplayServiceClient {
     this.methodDescriptorGetScreenplay);
   }
 
+  methodDescriptorListScreenplays = new grpcWeb.MethodDescriptor(
+    '/screenplay.ScreenplayService/ListScreenplays',
+    grpcWeb.MethodType.UNARY,
+    screenplay_pb.ListScreenplaysRequest,
+    screenplay_pb.ListScreenplaysResponse,
+    (request: screenplay_pb.ListScreenplaysRequest) => {
+      return request.serializeBinary();
+    },
+    screenplay_pb.ListScreenplaysResponse.deserializeBinary
+  );
+
+  listScreenplays(
+    request: screenplay_pb.ListScreenplaysRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<screenplay_pb.ListScreenplaysResponse>;
+
+  listScreenplays(
+    request: screenplay_pb.ListScreenplaysRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: screenplay_pb.ListScreenplaysResponse) => void): grpcWeb.ClientReadableStream<screenplay_pb.ListScreenplaysResponse>;
+
+  listScreenplays(
+    request: screenplay_pb.ListScreenplaysRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: screenplay_pb.ListScreenplaysResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/screenplay.ScreenplayService/ListScreenplays',
+        request,
+        metadata || {},
+        this.methodDescriptorListScreenplays,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/screenplay.ScreenplayService/ListScreenplays',
+    request,
+    metadata || {},
+    this.methodDescriptorListScreenplays);
+  }
+
 }
 

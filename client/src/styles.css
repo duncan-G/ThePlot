@@ -2,7 +2,9 @@
 
 :root {
     color-scheme: dark;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-mono: 'Courier Prime', 'Courier New', monospace;
+    --font-brand: 'Bebas Neue', 'Impact', sans-serif;
     --radius: 0.625rem;
 
     --background: #09090b;
@@ -127,13 +129,15 @@
     --color-scene-badge-text: var(--scene-badge-text);
     --color-loc-badge-bg: var(--loc-badge-bg);
     --color-loc-badge-text: var(--loc-badge-text);
+    --font-sans: var(--font-sans);
     --font-mono: var(--font-mono);
+    --font-brand: var(--font-brand);
 }
 
 body {
     background: var(--background);
     color: var(--foreground);
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
 }
 
 button {

@@ -7,6 +7,9 @@ import {
   ImportStatusEvent,
   GetScreenplayRequest,
   GetScreenplayResponse,
+  ListScreenplaysRequest,
+  ListScreenplaysResponse,
+  ScreenplaySummary as ScreenplaySummaryPb,
   SceneMessage,
   SceneElementMessage,
 } from './screenplay/screenplay_pb';
@@ -48,6 +51,19 @@ export interface ScreenplayData {
   authors: string[];
   scenes: ScreenplayScene[];
   totalPages: number;
+}
+
+export interface ScreenplaySummary {
+  id: string;
+  title: string;
+  authors: string[];
+  totalPages: number;
+  dateCreated: string;
+}
+
+export interface ScreenplayListPage {
+  items: ScreenplaySummary[];
+  nextPageToken: string;
 }
 
 const tracer = trace.getTracer('theplot-screenplay');
@@ -102,6 +118,20 @@ export class ScreenplayService {
     });
   }
 
+  async listScreenplays(pageSize = 20, pageToken = ''): Promise<ScreenplayListPage> {
+    const request = new ListScreenplaysRequest();
+    request.setPageSize(pageSize);
+    if (pageToken) {
+      request.setPageToken(pageToken);
+    }
+
+    const response = await this.client.listScreenplays(request);
+    return {
+      items: response.getItemsList().map(mapSummary),
+      nextPageToken: response.getNextPageToken(),
+    };
+  }
+
   async getScreenplay(screenplayId: string): Promise<ScreenplayData> {
     const request = new GetScreenplayRequest();
     request.setScreenplayId(screenplayId);
@@ -109,6 +139,16 @@ export class ScreenplayService {
     const response = await this.client.getScreenplay(request);
     return mapResponse(response);
   }
+}
+
+function mapSummary(s: ScreenplaySummaryPb): ScreenplaySummary {
+  return {
+    id: s.getId(),
+    title: s.getTitle(),
+    authors: s.getAuthorsList(),
+    totalPages: s.getTotalPages(),
+    dateCreated: s.getDateCreated(),
+  };
 }
 
 function mapResponse(res: GetScreenplayResponse): ScreenplayData {
