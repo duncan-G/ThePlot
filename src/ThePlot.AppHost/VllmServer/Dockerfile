@@ -4,6 +4,6 @@ RUN pip install --no-cache-dir supervisor
 
 COPY supervisord.conf /etc/supervisord.conf
 
-EXPOSE 8001 8002 8003
+EXPOSE 8001
 
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]

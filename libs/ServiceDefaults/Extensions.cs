@@ -27,10 +27,6 @@ public static class Extensions
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            // Turn on resilience by default
-            http.AddStandardResilienceHandler();
-
-            // Turn on service discovery by default
             http.AddServiceDiscovery();
         });
 
@@ -62,7 +58,10 @@ public static class Extensions
                             !(httpContext.Request.Path.StartsWithSegments(HealthEndpointPath)
                               || httpContext.Request.Path.StartsWithSegments(AlivenessEndpointPath))
                     )
-                    .AddHttpClientInstrumentation();
+                    .AddHttpClientInstrumentation(options =>
+                        options.FilterHttpRequestMessage = req =>
+                            !string.Equals(req.RequestUri?.AbsolutePath, "/health", StringComparison.OrdinalIgnoreCase)
+                    );
             });
 
         builder.AddOpenTelemetryExporters();

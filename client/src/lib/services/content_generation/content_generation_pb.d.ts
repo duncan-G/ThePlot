@@ -6,6 +6,9 @@ export class StartRunRequest extends jspb.Message {
   getScreenplayId(): string;
   setScreenplayId(value: string): StartRunRequest;
 
+  getCancelActive(): boolean;
+  setCancelActive(value: boolean): StartRunRequest;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): StartRunRequest.AsObject;
   static toObject(includeInstance: boolean, msg: StartRunRequest): StartRunRequest.AsObject;
@@ -17,6 +20,7 @@ export class StartRunRequest extends jspb.Message {
 export namespace StartRunRequest {
   export type AsObject = {
     screenplayId: string,
+    cancelActive: boolean,
   }
 }
 
@@ -287,6 +291,314 @@ export namespace GetRunStatusResponse {
     status: string,
     errorMessage: string,
     nodesList: Array<GenerationNodeStatusMessage.AsObject>,
+  }
+}
+
+export class GetLatestRunForScreenplayRequest extends jspb.Message {
+  getScreenplayId(): string;
+  setScreenplayId(value: string): GetLatestRunForScreenplayRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetLatestRunForScreenplayRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetLatestRunForScreenplayRequest): GetLatestRunForScreenplayRequest.AsObject;
+  static serializeBinaryToWriter(message: GetLatestRunForScreenplayRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetLatestRunForScreenplayRequest;
+  static deserializeBinaryFromReader(message: GetLatestRunForScreenplayRequest, reader: jspb.BinaryReader): GetLatestRunForScreenplayRequest;
+}
+
+export namespace GetLatestRunForScreenplayRequest {
+  export type AsObject = {
+    screenplayId: string,
+  }
+}
+
+export class GetNodeAudioRequest extends jspb.Message {
+  getNodeId(): string;
+  setNodeId(value: string): GetNodeAudioRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetNodeAudioRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetNodeAudioRequest): GetNodeAudioRequest.AsObject;
+  static serializeBinaryToWriter(message: GetNodeAudioRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetNodeAudioRequest;
+  static deserializeBinaryFromReader(message: GetNodeAudioRequest, reader: jspb.BinaryReader): GetNodeAudioRequest;
+}
+
+export namespace GetNodeAudioRequest {
+  export type AsObject = {
+    nodeId: string,
+  }
+}
+
+export class GetNodeAudioResponse extends jspb.Message {
+  getAudioBase64(): string;
+  setAudioBase64(value: string): GetNodeAudioResponse;
+
+  getAudioFormat(): string;
+  setAudioFormat(value: string): GetNodeAudioResponse;
+
+  getMimeType(): string;
+  setMimeType(value: string): GetNodeAudioResponse;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetNodeAudioResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: GetNodeAudioResponse): GetNodeAudioResponse.AsObject;
+  static serializeBinaryToWriter(message: GetNodeAudioResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetNodeAudioResponse;
+  static deserializeBinaryFromReader(message: GetNodeAudioResponse, reader: jspb.BinaryReader): GetNodeAudioResponse;
+}
+
+export namespace GetNodeAudioResponse {
+  export type AsObject = {
+    audioBase64: string,
+    audioFormat: string,
+    mimeType: string,
+  }
+}
+
+export class RunSummary extends jspb.Message {
+  getRunId(): string;
+  setRunId(value: string): RunSummary;
+
+  getStatus(): string;
+  setStatus(value: string): RunSummary;
+
+  getPhase(): string;
+  setPhase(value: string): RunSummary;
+
+  getCreatedAt(): string;
+  setCreatedAt(value: string): RunSummary;
+
+  getTotalNodes(): number;
+  setTotalNodes(value: number): RunSummary;
+
+  getSucceededNodes(): number;
+  setSucceededNodes(value: number): RunSummary;
+
+  getFailedNodes(): number;
+  setFailedNodes(value: number): RunSummary;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): RunSummary.AsObject;
+  static toObject(includeInstance: boolean, msg: RunSummary): RunSummary.AsObject;
+  static serializeBinaryToWriter(message: RunSummary, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): RunSummary;
+  static deserializeBinaryFromReader(message: RunSummary, reader: jspb.BinaryReader): RunSummary;
+}
+
+export namespace RunSummary {
+  export type AsObject = {
+    runId: string,
+    status: string,
+    phase: string,
+    createdAt: string,
+    totalNodes: number,
+    succeededNodes: number,
+    failedNodes: number,
+  }
+}
+
+export class ListRunsForScreenplayRequest extends jspb.Message {
+  getScreenplayId(): string;
+  setScreenplayId(value: string): ListRunsForScreenplayRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ListRunsForScreenplayRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: ListRunsForScreenplayRequest): ListRunsForScreenplayRequest.AsObject;
+  static serializeBinaryToWriter(message: ListRunsForScreenplayRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ListRunsForScreenplayRequest;
+  static deserializeBinaryFromReader(message: ListRunsForScreenplayRequest, reader: jspb.BinaryReader): ListRunsForScreenplayRequest;
+}
+
+export namespace ListRunsForScreenplayRequest {
+  export type AsObject = {
+    screenplayId: string,
+  }
+}
+
+export class ListRunsForScreenplayResponse extends jspb.Message {
+  getRunsList(): Array<RunSummary>;
+  setRunsList(value: Array<RunSummary>): ListRunsForScreenplayResponse;
+  clearRunsList(): ListRunsForScreenplayResponse;
+  addRuns(value?: RunSummary, index?: number): RunSummary;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ListRunsForScreenplayResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: ListRunsForScreenplayResponse): ListRunsForScreenplayResponse.AsObject;
+  static serializeBinaryToWriter(message: ListRunsForScreenplayResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ListRunsForScreenplayResponse;
+  static deserializeBinaryFromReader(message: ListRunsForScreenplayResponse, reader: jspb.BinaryReader): ListRunsForScreenplayResponse;
+}
+
+export namespace ListRunsForScreenplayResponse {
+  export type AsObject = {
+    runsList: Array<RunSummary.AsObject>,
+  }
+}
+
+export class NodeLineDetail extends jspb.Message {
+  getElementId(): string;
+  setElementId(value: string): NodeLineDetail;
+
+  getCharacterName(): string;
+  setCharacterName(value: string): NodeLineDetail;
+
+  getType(): string;
+  setType(value: string): NodeLineDetail;
+
+  getText(): string;
+  setText(value: string): NodeLineDetail;
+
+  getVoiceName(): string;
+  setVoiceName(value: string): NodeLineDetail;
+
+  getVoiceDescription(): string;
+  setVoiceDescription(value: string): NodeLineDetail;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): NodeLineDetail.AsObject;
+  static toObject(includeInstance: boolean, msg: NodeLineDetail): NodeLineDetail.AsObject;
+  static serializeBinaryToWriter(message: NodeLineDetail, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): NodeLineDetail;
+  static deserializeBinaryFromReader(message: NodeLineDetail, reader: jspb.BinaryReader): NodeLineDetail;
+}
+
+export namespace NodeLineDetail {
+  export type AsObject = {
+    elementId: string,
+    characterName: string,
+    type: string,
+    text: string,
+    voiceName: string,
+    voiceDescription: string,
+  }
+}
+
+export class GenerationNodeDetail extends jspb.Message {
+  getNodeId(): string;
+  setNodeId(value: string): GenerationNodeDetail;
+
+  getKind(): string;
+  setKind(value: string): GenerationNodeDetail;
+
+  getStatus(): string;
+  setStatus(value: string): GenerationNodeDetail;
+
+  getRetryCount(): number;
+  setRetryCount(value: number): GenerationNodeDetail;
+
+  getLastError(): string;
+  setLastError(value: string): GenerationNodeDetail;
+
+  getSceneId(): string;
+  setSceneId(value: string): GenerationNodeDetail;
+
+  getElementIdsList(): Array<string>;
+  setElementIdsList(value: Array<string>): GenerationNodeDetail;
+  clearElementIdsList(): GenerationNodeDetail;
+  addElementIds(value: string, index?: number): GenerationNodeDetail;
+
+  getVoiceName(): string;
+  setVoiceName(value: string): GenerationNodeDetail;
+
+  getVoiceDescription(): string;
+  setVoiceDescription(value: string): GenerationNodeDetail;
+
+  getCharacterName(): string;
+  setCharacterName(value: string): GenerationNodeDetail;
+
+  getText(): string;
+  setText(value: string): GenerationNodeDetail;
+
+  getLinesList(): Array<NodeLineDetail>;
+  setLinesList(value: Array<NodeLineDetail>): GenerationNodeDetail;
+  clearLinesList(): GenerationNodeDetail;
+  addLines(value?: NodeLineDetail, index?: number): NodeLineDetail;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GenerationNodeDetail.AsObject;
+  static toObject(includeInstance: boolean, msg: GenerationNodeDetail): GenerationNodeDetail.AsObject;
+  static serializeBinaryToWriter(message: GenerationNodeDetail, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GenerationNodeDetail;
+  static deserializeBinaryFromReader(message: GenerationNodeDetail, reader: jspb.BinaryReader): GenerationNodeDetail;
+}
+
+export namespace GenerationNodeDetail {
+  export type AsObject = {
+    nodeId: string,
+    kind: string,
+    status: string,
+    retryCount: number,
+    lastError: string,
+    sceneId: string,
+    elementIdsList: Array<string>,
+    voiceName: string,
+    voiceDescription: string,
+    characterName: string,
+    text: string,
+    linesList: Array<NodeLineDetail.AsObject>,
+  }
+}
+
+export class GetRunDetailsRequest extends jspb.Message {
+  getRunId(): string;
+  setRunId(value: string): GetRunDetailsRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetRunDetailsRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: GetRunDetailsRequest): GetRunDetailsRequest.AsObject;
+  static serializeBinaryToWriter(message: GetRunDetailsRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetRunDetailsRequest;
+  static deserializeBinaryFromReader(message: GetRunDetailsRequest, reader: jspb.BinaryReader): GetRunDetailsRequest;
+}
+
+export namespace GetRunDetailsRequest {
+  export type AsObject = {
+    runId: string,
+  }
+}
+
+export class GetRunDetailsResponse extends jspb.Message {
+  getRunId(): string;
+  setRunId(value: string): GetRunDetailsResponse;
+
+  getScreenplayId(): string;
+  setScreenplayId(value: string): GetRunDetailsResponse;
+
+  getPhase(): string;
+  setPhase(value: string): GetRunDetailsResponse;
+
+  getStatus(): string;
+  setStatus(value: string): GetRunDetailsResponse;
+
+  getErrorMessage(): string;
+  setErrorMessage(value: string): GetRunDetailsResponse;
+
+  getCreatedAt(): string;
+  setCreatedAt(value: string): GetRunDetailsResponse;
+
+  getNodesList(): Array<GenerationNodeDetail>;
+  setNodesList(value: Array<GenerationNodeDetail>): GetRunDetailsResponse;
+  clearNodesList(): GetRunDetailsResponse;
+  addNodes(value?: GenerationNodeDetail, index?: number): GenerationNodeDetail;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): GetRunDetailsResponse.AsObject;
+  static toObject(includeInstance: boolean, msg: GetRunDetailsResponse): GetRunDetailsResponse.AsObject;
+  static serializeBinaryToWriter(message: GetRunDetailsResponse, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): GetRunDetailsResponse;
+  static deserializeBinaryFromReader(message: GetRunDetailsResponse, reader: jspb.BinaryReader): GetRunDetailsResponse;
+}
+
+export namespace GetRunDetailsResponse {
+  export type AsObject = {
+    runId: string,
+    screenplayId: string,
+    phase: string,
+    status: string,
+    errorMessage: string,
+    createdAt: string,
+    nodesList: Array<GenerationNodeDetail.AsObject>,
   }
 }
 

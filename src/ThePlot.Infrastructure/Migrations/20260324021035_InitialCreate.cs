@@ -85,6 +85,7 @@ namespace ThePlot.Infrastructure.Migrations
                     audio_blob_uri = table.Column<string>(type: "text", nullable: true),
                     audio_mime_type = table.Column<string>(type: "text", nullable: true),
                     audio_metadata = table.Column<JsonDocument>(type: "jsonb", nullable: true),
+                    embedding = table.Column<Vector>(type: "vector(1024)", nullable: true),
                     date_created = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     date_last_modified = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },
@@ -110,6 +111,7 @@ namespace ThePlot.Infrastructure.Migrations
                     phase = table.Column<string>(type: "text", nullable: false),
                     status = table.Column<string>(type: "text", nullable: false),
                     error_message = table.Column<string>(type: "text", nullable: true),
+                    trace_parent = table.Column<string>(type: "text", nullable: true),
                     date_created = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     date_last_modified = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
                 },

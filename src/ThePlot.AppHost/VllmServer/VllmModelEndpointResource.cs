@@ -12,7 +12,8 @@ public sealed class VllmModelEndpointResource(
     string name,
     ContainerResource container,
     string endpointName,
-    string modelName) : Resource(name), IResourceWithConnectionString, IResourceWithParent<ContainerResource>
+    string modelName,
+    string basePath = "") : Resource(name), IResourceWithConnectionString, IResourceWithParent<ContainerResource>
 {
     /// <inheritdoc />
     public ContainerResource Parent => container;
@@ -33,6 +34,8 @@ public sealed class VllmModelEndpointResource(
             b.Append($"{host}");
             b.AppendLiteral(":");
             b.Append($"{port}");
+            if (!string.IsNullOrEmpty(basePath))
+                b.AppendLiteral(basePath);
             b.AppendLiteral(";Key=local-dev;Model=");
             b.AppendLiteral(modelName);
             return b.Build();

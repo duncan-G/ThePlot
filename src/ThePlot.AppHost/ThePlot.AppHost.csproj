@@ -30,5 +30,6 @@
     <PackageReference Include="Aspire.Hosting.Azure.PostgreSQL" Version="13.2.1" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.2.1" />
     <PackageReference Include="Azure.Provisioning.EventGrid" Version="1.1.0" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.1.1" />
   </ItemGroup>
 </Project>

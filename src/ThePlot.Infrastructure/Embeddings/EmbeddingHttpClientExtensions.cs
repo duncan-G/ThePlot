@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 
 namespace ThePlot.Infrastructure.Embeddings;
 
@@ -8,11 +9,15 @@ public static class EmbeddingHttpClientExtensions
 
     public static IHttpClientBuilder AddEmbeddingClient(this IServiceCollection services)
     {
-        return services
+        var builder = services
             .AddHttpClient<IEmbeddingClient, EmbeddingHttpClient>(NamedClient, client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(2);
             })
             .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+
+        builder.AddStandardResilienceHandler();
+
+        return builder;
     }
 }

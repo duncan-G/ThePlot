@@ -12,6 +12,7 @@ builder.AddDatabaseServices("theplot-db", options =>
 });
 
 builder.Services.AddContentGenerationWorkerServices(builder.Configuration);
+builder.Services.AddContentGenerationGpuServices();
 builder.Services.AddHostedService<ContentGenerationWorker>();
 
 var host = builder.Build();

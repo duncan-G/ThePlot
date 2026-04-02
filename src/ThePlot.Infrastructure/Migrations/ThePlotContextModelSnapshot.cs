@@ -310,6 +310,10 @@ namespace ThePlot.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_parent");
+
                     b.HasKey("Id")
                         .HasName("pk_generation_runs");
 

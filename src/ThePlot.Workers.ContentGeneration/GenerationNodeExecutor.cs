@@ -1,19 +1,20 @@
+#pragma warning disable MEAI001
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ThePlot.Core.ContentGeneration;
 using ThePlot.Infrastructure;
 using ThePlot.Infrastructure.ContentGeneration;
-using ThePlot.Infrastructure.Tts;
 
 namespace ThePlot.Workers.ContentGeneration;
 
 public sealed class GenerationNodeExecutor(
     ThePlotContext db,
-    ITtsSpeechClient ttsSpeechClient,
+    ITextToSpeechClient ttsClient,
     IOptions<ContentGenerationOptions> options,
     ILogger<GenerationNodeExecutor> logger)
 {
@@ -24,11 +25,28 @@ public sealed class GenerationNodeExecutor(
             .Include(n => n.GenerationRun)
             .FirstAsync(n => n.Id == work.NodeId, ct);
 
+        using var activity = ContentGenerationTelemetry.StartActivity(
+            "ContentGeneration.ExecuteNode", node.GenerationRun?.TraceParent);
+        activity?.SetTag("contentgen.run_id", node.GenerationRunId.ToString());
+        activity?.SetTag("contentgen.node_id", node.Id.ToString());
+        activity?.SetTag("contentgen.node_kind", node.Kind.ToString());
+        activity?.SetTag("contentgen.worker_id", workerId);
+        activity?.SetTag("contentgen.attempt_id", work.AttemptId.ToString());
+
         if (node.LeaseWorkerId != workerId || node.CurrentAttemptId != work.AttemptId)
         {
             logger.LogWarning(
                 "Skipping stale work for node {NodeId}; lease or attempt mismatch.",
                 work.NodeId);
+            activity?.SetTag("contentgen.skipped", true);
+            return;
+        }
+
+        if (node.GenerationRun?.Status == GenerationRunStatus.Cancelled
+            || node.Status == GenerationNodeStatus.Cancelled)
+        {
+            logger.LogInformation("Skipping node {NodeId}; run or node was cancelled.", work.NodeId);
+            activity?.SetTag("contentgen.skipped_cancelled", true);
             return;
         }
 
@@ -50,11 +68,13 @@ public sealed class GenerationNodeExecutor(
                     throw new InvalidOperationException($"Unsupported node kind {node.Kind}.");
             }
 
+            activity?.SetTag("contentgen.node_result", "succeeded");
             await db.SaveChangesAsync(ct);
             await TryCompleteRunIfAllSucceededAsync(node.GenerationRunId, ct);
         }
         catch (Exception ex)
         {
+            ContentGenerationTelemetry.RecordError(activity, ex);
             logger.LogWarning(ex, "Generation node {NodeId} attempt {AttemptId} failed.", work.NodeId, work.AttemptId);
             attempt.MarkFailed(ex.Message);
             var backoffSeconds = Math.Pow(2, node.RetryCount) * opt.RetryBackoffBase.TotalSeconds;
@@ -64,7 +84,13 @@ public sealed class GenerationNodeExecutor(
 
             if (node.Status == GenerationNodeStatus.Failed)
             {
+                activity?.SetTag("contentgen.node_result", "failed_permanently");
                 await MarkRunFailedIfNeededAsync(node.GenerationRunId, ex.Message, ct);
+            }
+            else
+            {
+                activity?.SetTag("contentgen.node_result", "needs_retry");
+                activity?.SetTag("contentgen.retry_count", node.RetryCount);
             }
         }
     }
@@ -102,19 +128,24 @@ public sealed class GenerationNodeExecutor(
         var prompt = BuildTtsPrompt(node);
         attempt.SetProviderRequestJson(JsonSerializer.SerializeToDocument(new { prompt, node.Kind }));
 
-        var result = await ttsSpeechClient.GetSpeechAsync(prompt, ct);
-        var audioRaw = result.AudioBase64 ?? "";
+        var response = await ttsClient.GetAudioAsync(prompt, cancellationToken: ct);
+        var audioContent = response.Contents.OfType<DataContent>().FirstOrDefault();
+        var bytes = audioContent?.Data.ToArray() ?? [];
+        var audioRaw = Convert.ToBase64String(bytes);
+        var mediaType = audioContent?.MediaType ?? "audio/wav";
+        var audioFormat = mediaType.Split('/').LastOrDefault() ?? "wav";
+        if (audioFormat == "mpeg") audioFormat = "mp3";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(audioRaw)));
 
         var artifact = GeneratedArtifact.Create(
             node.Id,
             attempt.Id,
             isCurrent: true,
-            storageUri: $"inline:audio/{result.AudioFormat};base64",
-            mimeType: $"audio/{result.AudioFormat}",
+            storageUri: $"inline:{mediaType};base64",
+            mimeType: mediaType,
             contentHash: hash,
             metadata: JsonSerializer.SerializeToDocument(
-                new { result.AudioBase64, result.AudioFormat, lengthChars = prompt.Length }));
+                new { AudioBase64 = audioRaw, AudioFormat = audioFormat, lengthChars = prompt.Length }));
 
         foreach (var old in await db.GeneratedArtifacts
                      .Where(a => a.GenerationNodeId == node.Id && a.IsCurrent)
@@ -125,7 +156,7 @@ public sealed class GenerationNodeExecutor(
 
         db.GeneratedArtifacts.Add(artifact);
         attempt.MarkSucceeded(
-            JsonSerializer.SerializeToDocument(new { format = result.AudioFormat, contentHash = hash }));
+            JsonSerializer.SerializeToDocument(new { format = audioFormat, contentHash = hash }));
 
         node.MarkSucceeded();
     }
@@ -138,6 +169,8 @@ public sealed class GenerationNodeExecutor(
         }
 
         var root = node.Payload.RootElement;
+        string raw;
+
         if (node.Kind == GenerationNodeKind.VoicePromptBatch &&
             root.TryGetProperty("lines", out var lines) &&
             lines.ValueKind == JsonValueKind.Array)
@@ -145,18 +178,21 @@ public sealed class GenerationNodeExecutor(
             var sb = new StringBuilder();
             foreach (var line in lines.EnumerateArray())
             {
-                var voice = line.TryGetProperty("voiceId", out var s) ? s.GetString() : "?";
                 var text = line.TryGetProperty("text", out var t) ? t.GetString() : "";
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    sb.Append("Voice ").Append(voice).Append(": ").AppendLine(text);
+                    sb.AppendLine(text);
                 }
             }
 
-            return sb.ToString().Trim();
+            raw = sb.ToString().Trim();
+        }
+        else
+        {
+            raw = root.TryGetProperty("text", out var te) ? te.GetString() ?? "" : "";
         }
 
-        return root.TryGetProperty("text", out var te) ? te.GetString() ?? "" : "";
+        return TextNormalizer.Normalize(raw);
     }
 
     private async Task TryCompleteRunIfAllSucceededAsync(Guid runId, CancellationToken ct)

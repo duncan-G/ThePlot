@@ -14,13 +14,14 @@ public sealed class GenerationRun : IDateStamped
     public GenerationWorkflowPhase Phase { get; private set; }
     public GenerationRunStatus Status { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public string? TraceParent { get; private set; }
     public DateTime DateCreated { get; set; }
     public DateTime DateLastModified { get; set; }
 
     public Screenplay? Screenplay { get; private init; }
     public ICollection<GenerationNode>? Nodes { get; private init; }
 
-    public static GenerationRun Start(Guid screenplayId)
+    public static GenerationRun Start(Guid screenplayId, string? traceParent = null)
     {
         return new GenerationRun
         {
@@ -28,6 +29,7 @@ public sealed class GenerationRun : IDateStamped
             ScreenplayId = screenplayId,
             Phase = GenerationWorkflowPhase.CharacterResolution,
             Status = GenerationRunStatus.Pending,
+            TraceParent = traceParent,
             Nodes = []
         };
     }
@@ -48,6 +50,17 @@ public sealed class GenerationRun : IDateStamped
     {
         Status = GenerationRunStatus.Failed;
         ErrorMessage = message;
+    }
+
+    public void MarkCancelled(string? message = null)
+    {
+        Status = GenerationRunStatus.Cancelled;
+        ErrorMessage = message;
+    }
+
+    public void AdvanceToVoiceDeterminationPhase()
+    {
+        Phase = GenerationWorkflowPhase.VoiceDetermination;
     }
 
     public void AdvanceToContentGenerationPhase()

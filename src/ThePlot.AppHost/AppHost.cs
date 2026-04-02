@@ -1,3 +1,4 @@
+using Aspire.Hosting;
 using Azure.Provisioning.Storage;
 using ThePlot.AppHost.BlobStorage;
 using ThePlot.AppHost.ClientApp;
@@ -31,6 +32,9 @@ var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service"
 IResourceBuilder<IResourceWithConnectionString> ttsServer;
 IResourceBuilder<IResourceWithConnectionString> chatServer;
 IResourceBuilder<IResourceWithConnectionString> embedServer;
+IResourceBuilder<ContainerResource>? vllmContainer = null;
+IResourceBuilder<OllamaModelResource>? ollamaChatModel = null;
+IResourceBuilder<OllamaModelResource>? ollamaEmbedModel = null;
 
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -42,14 +46,21 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 else
 {
-    (ttsServer, chatServer, embedServer) = builder.AddVllmComposite(
+    (ttsServer, vllmContainer) = builder.AddVllmComposite(
         otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName));
-    grpcServer = grpcServer.WithReference(ttsServer).WaitFor(ttsServer);
-}
+    grpcServer = grpcServer.WithReference(ttsServer);
 
-grpcServer = grpcServer
-    .WithReference(chatServer)
-    .WithReference(embedServer);
+    var ollama = builder.AddOllama("ollama")
+        .WithDataVolume("theplot-ollama-cache")
+        .WithGPUSupport();
+    ollamaChatModel = ollama.AddModel("chat-model", "qwen3:0.6b");
+    ollamaEmbedModel = ollama.AddModel("embed-model", "qwen3-embedding:0.6b");
+
+    chatServer = VllmServerResourceBuilderExtensions.CreateEndpointResource(
+        builder, "chat-server", ollama, "http", "qwen3:0.6b", basePath: "/v1");
+    embedServer = VllmServerResourceBuilderExtensions.CreateEndpointResource(
+        builder, "embedding-server", ollama, "http", "qwen3-embedding:0.6b");
+}
 
 var postgresDb = builder.AddDatabase("theplot-db");
 var schemaMigrations = builder.WithSchemaMigrations<Projects.ThePlot_SchemaMigrations>(postgresDb, "theplot-schema-migrations");
@@ -119,9 +130,8 @@ builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worke
     .WaitFor(serviceBus)
     .WaitFor(grpcServer);
 
-builder.AddProject<Projects.ThePlot_Workers_ContentGeneration>("content-generation-worker")
+var contentGenWorker = builder.AddProject<Projects.ThePlot_Workers_ContentGeneration>("content-generation-worker")
     .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
-    .WithReplicas(2)
     .WithReference(postgresDb)
     .WithReference(ttsServer)
     .WithReference(chatServer)
@@ -129,10 +139,14 @@ builder.AddProject<Projects.ThePlot_Workers_ContentGeneration>("content-generati
     .WithOtlpCollectorReference(otelCollector)
     .WaitFor(postgresDb)
     .WaitFor(schemaMigrations)
-    .WaitFor(ttsServer)
-    .WaitFor(chatServer)
-    .WaitFor(embedServer)
     .WaitFor(grpcServer);
+
+if (vllmContainer is not null)
+    contentGenWorker.WaitFor(vllmContainer);
+if (ollamaChatModel is not null)
+    contentGenWorker.WaitFor(ollamaChatModel);
+if (ollamaEmbedModel is not null)
+    contentGenWorker.WaitFor(ollamaEmbedModel);
 
 var envoyProxy = builder.AddEnvoyProxy("envoy-proxy")
     .WithReference(otelCollector)

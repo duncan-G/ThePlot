@@ -1,4 +1,7 @@
+#pragma warning disable MEAI001
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 
 namespace ThePlot.Infrastructure.Tts;
 
@@ -6,13 +9,25 @@ public static class TtsHttpClientExtensions
 {
     public const string NamedClient = "tts-speech";
 
-    public static IHttpClientBuilder AddTtsSpeechClient(this IServiceCollection services)
+    public static IServiceCollection AddTtsSpeechClient(this IServiceCollection services)
     {
-        return services
-            .AddHttpClient<ITtsSpeechClient, TtsSpeechClient>(NamedClient, client =>
+        services
+            .AddHttpClient<TtsSpeechClient>(NamedClient, client =>
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
             })
-            .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+            .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+            .AddStandardResilienceHandler(options =>
+            {
+                options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(30);
+                options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+            });
+
+        services
+            .AddTextToSpeechClient(sp => sp.GetRequiredService<TtsSpeechClient>())
+            .UseOpenTelemetry();
+
+        return services;
     }
 }

@@ -313,6 +313,10 @@ namespace ThePlot.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("TraceParent")
+                        .HasColumnType("text")
+                        .HasColumnName("trace_parent");
+
                     b.HasKey("Id")
                         .HasName("pk_generation_runs");
 
@@ -674,6 +678,10 @@ namespace ThePlot.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<Vector>("Embedding")
+                        .HasColumnType("vector(1024)")
+                        .HasColumnName("embedding");
 
                     b.Property<string>("Name")
                         .IsRequired()

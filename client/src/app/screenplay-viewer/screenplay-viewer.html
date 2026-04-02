@@ -76,12 +76,22 @@
       </div>
 
       <nav class="flex flex-1 flex-col gap-0.5 px-3">
-        <button type="button"
-          class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground/70 transition-colors hover:bg-accent hover:text-foreground">
+        <button type="button" (click)="switchTab('screenplay')"
+          [class]="'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors '
+            + (activeTab() === 'screenplay' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-accent hover:text-foreground')">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
           </svg>
-          Characters
+          Script
+        </button>
+
+        <button type="button" (click)="switchTab('generation')"
+          [class]="'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors '
+            + (activeTab() === 'generation' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-accent hover:text-foreground')">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+          Generation
         </button>
 
         <div class="relative">
@@ -112,15 +122,27 @@
                   }
                 </button>
               </div>
+
+              <div class="mt-3 flex items-center justify-between">
+                <span class="text-sm text-foreground">Auto-scroll</span>
+                <button type="button" (click)="toggleScrollWhilePlaying()"
+                  [class]="'relative h-5 w-9 rounded-full transition-colors '
+                    + (audioPlayback.scrollWhilePlaying() ? 'bg-primary' : 'bg-muted')"
+                  aria-label="Toggle scroll while playing">
+                  <span [class]="'absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform '
+                    + (audioPlayback.scrollWhilePlaying() ? 'translate-x-4' : 'translate-x-0')">
+                  </span>
+                </button>
+              </div>
             </div>
           }
         </div>
 
         <div class="flex-1"></div>
 
-        <!-- Generate Button -->
+        <!-- Generate / Play Button -->
         <div class="flex flex-col items-center gap-2 px-2 pb-6 pt-4">
-          @if (generationStatus() !== 'idle') {
+          @if (isGenerating()) {
             <button type="button" (click)="toggleProgressPopup()"
               class="mb-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground">
               @if (generationProgress().total > 0) {
@@ -133,43 +155,97 @@
             @if (isGenerating()) {
               <div class="generate-ring-spin absolute -inset-1.5 rounded-full border-2 border-transparent border-t-primary"></div>
             }
-            <button type="button"
-              (click)="isGenerating() ? toggleProgressPopup() : startGeneration()"
-              [disabled]="generationStatus() === 'starting'"
-              [class]="'relative flex h-14 w-14 items-center justify-center rounded-full transition-all '
-                + (generationStatus() === 'completed' ? 'bg-green-600 text-white' :
-                   generationStatus() === 'failed' ? 'bg-destructive text-destructive-foreground' :
-                   'bg-primary text-primary-foreground hover:bg-primary/90')
-                + (generationStatus() === 'starting' ? ' opacity-60' : '')"
-              [attr.aria-label]="isGenerating() ? 'View progress' : 'Generate audio'">
-              @if (generationStatus() === 'starting') {
-                <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
-              } @else if (generationStatus() === 'completed') {
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                </svg>
-              } @else if (generationStatus() === 'failed') {
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-              } @else {
-                <svg class="h-6 w-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5.14v14l11-7-11-7z" />
-                </svg>
-              }
-            </button>
+            @if (audioPlayback.isPlaying() || audioPlayback.state() === 'loading') {
+              <div class="audio-pulse-ring absolute -inset-1.5 rounded-full border-2 border-green-500/40 animate-pulse"></div>
+            }
+
+            @if (hasGeneratedContent() && !isGenerating()) {
+              <!-- Play/Pause button when content exists -->
+              <button type="button"
+                (click)="togglePlayPause()"
+                [class]="'relative flex h-14 w-14 items-center justify-center rounded-full transition-all '
+                  + (audioPlayback.isPlaying() || audioPlayback.state() === 'loading'
+                    ? 'bg-green-600 text-white shadow-lg shadow-green-600/25 hover:bg-green-700'
+                    : audioPlayback.state() === 'paused'
+                      ? 'bg-green-600/80 text-white hover:bg-green-600'
+                      : 'bg-green-600 text-white hover:bg-green-700')"
+                [attr.aria-label]="audioPlayback.isPlaying() ? 'Pause playback' : 'Play generated audio'">
+                @if (audioPlayback.state() === 'loading') {
+                  <div class="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                } @else if (audioPlayback.isPlaying()) {
+                  <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                } @else {
+                  <svg class="h-6 w-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v14l11-7-11-7z" />
+                  </svg>
+                }
+              </button>
+            } @else {
+              <!-- Generate / Continue / Progress button -->
+              <button type="button"
+                (click)="isGenerating() ? toggleProgressPopup() : canContinueGeneration() ? continueGeneration() : startGeneration()"
+                [disabled]="generationStatus() === 'starting'"
+                [class]="'relative flex h-14 w-14 items-center justify-center rounded-full transition-all '
+                  + (generationStatus() === 'failed' && !canContinueGeneration() ? 'bg-destructive text-destructive-foreground' :
+                     'bg-primary text-primary-foreground hover:bg-primary/90')
+                  + (generationStatus() === 'starting' ? ' opacity-60' : '')"
+                [attr.aria-label]="isGenerating() ? 'View progress' : canContinueGeneration() ? 'Continue generation' : 'Generate audio'">
+                @if (generationStatus() === 'starting') {
+                  <div class="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
+                } @else if (generationStatus() === 'failed' && !canContinueGeneration()) {
+                  <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                } @else if (canContinueGeneration()) {
+                  <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                  </svg>
+                } @else {
+                  <svg class="h-6 w-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v14l11-7-11-7z" />
+                  </svg>
+                }
+              </button>
+            }
           </div>
 
-          <span class="font-mono text-[10px] text-muted-foreground">
+          <!-- Stop button (when playing) — fixed-size placeholder to prevent layout shift -->
+          <div class="flex h-6 w-6 items-center justify-center">
+            @if (audioPlayback.isActive()) {
+              <button type="button" (click)="stopPlayback()"
+                class="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Stop playback">
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 6h12v12H6z" />
+                </svg>
+              </button>
+            }
+          </div>
+
+          <!-- Continue generation button -->
+          @if (canContinueGeneration() && !audioPlayback.isActive()) {
+            <button type="button" (click)="continueGeneration()"
+              class="flex h-7 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 font-mono text-[10px] font-medium text-primary transition-colors hover:bg-primary/20"
+              aria-label="Continue generation">
+              <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+              </svg>
+              Continue
+            </button>
+          }
+
+          <span class="min-h-4 font-mono text-[10px] text-muted-foreground">
             @if (generationStatus() === 'starting') {
               Starting…
             } @else if (isGenerating()) {
               Generating
-            } @else if (generationStatus() === 'completed') {
-              Complete
+            } @else if (canContinueGeneration()) {
+              {{ generationProgress().succeeded }}/{{ generationProgress().total }} done
             } @else if (generationStatus() === 'failed') {
               Failed
-            } @else {
+            } @else if (!hasGeneratedContent()) {
               Generate
             }
           </span>
@@ -207,10 +283,7 @@
           }
         </div>
 
-        <div class="flex items-center gap-3">
-          <span class="font-mono text-xs text-muted-foreground/80">
-            {{ scenes().length }} scenes
-          </span>
+        <div class="flex items-center gap-2">
 
           <button
             type="button"
@@ -237,7 +310,319 @@
         </div>
       }
 
+      <!-- Generation tab panel -->
+      @if (activeTab() === 'generation') {
+        <div class="vertical-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+
+          <!-- Continue Generation banner -->
+          @if (canContinueGeneration()) {
+            <div class="mb-4 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
+              <div class="flex-1">
+                <p class="font-mono text-sm font-medium text-foreground">Generation incomplete</p>
+                <p class="mt-0.5 font-mono text-xs text-muted-foreground">
+                  {{ generationProgress().succeeded }}/{{ generationProgress().total }} nodes succeeded
+                  @if (generationProgress().failed > 0) {
+                    <span class="text-destructive"> · {{ generationProgress().failed }} failed</span>
+                  }
+                </p>
+              </div>
+              <button type="button" (click)="continueGeneration()"
+                class="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-mono text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                </svg>
+                Continue Generation
+              </button>
+            </div>
+          }
+
+          @if (generationRunsLoading()) {
+            <div class="flex items-center justify-center py-16">
+              <div class="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
+            </div>
+          } @else if (generationRuns().length === 0) {
+            <div class="flex flex-col items-center justify-center py-16 text-center">
+              <svg class="mb-4 h-10 w-10 text-muted-foreground/30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+              </svg>
+              <p class="font-mono text-sm text-muted-foreground">No generation attempts yet.</p>
+              <p class="mt-1 font-mono text-xs text-muted-foreground/60">Use the Generate button to start.</p>
+            </div>
+          } @else {
+            <div class="space-y-3">
+              @for (run of generationRuns(); track run.runId) {
+                <div class="rounded-xl border border-border bg-card overflow-hidden">
+
+                  <!-- Run header row -->
+                  <button type="button" (click)="selectRun(run.runId)"
+                    class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50">
+
+                    <!-- Status dot -->
+                    <div [class]="'h-2.5 w-2.5 shrink-0 rounded-full '
+                      + (run.status === 'Completed' ? 'bg-green-500' :
+                         run.status === 'Failed' ? 'bg-destructive' :
+                         run.status === 'Running' ? 'animate-pulse bg-primary' :
+                         run.status === 'Cancelled' ? 'bg-muted-foreground' : 'bg-muted-foreground')">
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span [class]="'font-mono text-xs font-semibold ' + getRunStatusColor(run.status)">
+                          {{ run.status }}
+                        </span>
+                        <span class="font-mono text-[10px] text-muted-foreground/60">{{ run.phase }}</span>
+                        <span class="font-mono text-[10px] text-muted-foreground/50">{{ formatRunDate(run.createdAt) }}</span>
+                      </div>
+                      @if (run.totalNodes > 0) {
+                        <div class="mt-1 flex items-center gap-3">
+                          <div class="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                            <div class="h-full rounded-full bg-green-500 transition-all"
+                              [style.width.%]="run.totalNodes > 0 ? (run.succeededNodes / run.totalNodes) * 100 : 0">
+                            </div>
+                          </div>
+                          <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                            {{ run.succeededNodes }}/{{ run.totalNodes }}
+                            @if (run.failedNodes > 0) {
+                              <span class="text-destructive"> · {{ run.failedNodes }} failed</span>
+                            }
+                          </span>
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Expand chevron -->
+                    <svg [class]="'h-4 w-4 shrink-0 text-muted-foreground/60 transition-transform '
+                      + (selectedRunDetails()?.runId === run.runId ? 'rotate-180' : '')"
+                      fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  <!-- Run detail (expanded) -->
+                  @if (selectedRunDetails()?.runId === run.runId) {
+                    @if (selectedRunDetailsLoading()) {
+                      <div class="border-t border-border px-4 py-6 flex justify-center">
+                        <div class="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
+                      </div>
+                    } @else if (selectedRunDetails()) {
+
+                      <!-- Filter bar -->
+                      <div class="flex flex-wrap items-center gap-1.5 border-t border-border px-3 py-2.5 bg-muted/30">
+                        @for (f of nodeFilterOptions; track f.value) {
+                          <button type="button" (click)="setNodeFilter(f.value)"
+                            [class]="'flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px] transition-colors '
+                              + (nodeStatusFilter() === f.value
+                                ? (f.value === 'succeeded' ? 'bg-green-500/20 text-green-500' :
+                                   f.value === 'failed'    ? 'bg-destructive/20 text-destructive' :
+                                   f.value === 'pending'   ? 'bg-primary/15 text-primary' :
+                                   'bg-accent text-foreground')
+                                : 'text-muted-foreground hover:bg-accent hover:text-foreground')">
+                            @if (f.value === 'succeeded') {
+                              <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                            } @else if (f.value === 'failed') {
+                              <span class="h-1.5 w-1.5 rounded-full bg-destructive"></span>
+                            } @else if (f.value === 'pending') {
+                              <span class="h-1.5 w-1.5 rounded-full bg-primary/80"></span>
+                            }
+                            {{ f.label }}
+                            <span class="opacity-60">
+                              ({{ f.value === 'all' ? nodeFilterCounts().all
+                                : f.value === 'succeeded' ? nodeFilterCounts().succeeded
+                                : f.value === 'failed'    ? nodeFilterCounts().failed
+                                : nodeFilterCounts().pending }})
+                            </span>
+                          </button>
+                        }
+                      </div>
+
+                      <!-- Scenes with nodes -->
+                      @if (groupedNodes().length === 0) {
+                        <div class="border-t border-border px-4 py-6 text-center font-mono text-xs text-muted-foreground">
+                          No nodes match this filter.
+                        </div>
+                      } @else {
+                        <div class="border-t border-border">
+                          @for (group of groupedNodes(); track group.sceneId) {
+
+                            <!-- Scene header (collapsible) -->
+                            <button type="button" (click)="toggleSceneCollapse(group.sceneId)"
+                              class="flex w-full items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:bg-muted/40">
+                              <svg [class]="'h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform ' + (isSceneCollapsed(group.sceneId) ? '-rotate-90' : '')"
+                                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7" />
+                              </svg>
+                              <span class="truncate font-mono text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                                {{ group.sceneLabel }}
+                              </span>
+                              <span class="ml-auto shrink-0 font-mono text-[10px] text-muted-foreground/60">
+                                {{ group.nodes.length }} node{{ group.nodes.length === 1 ? '' : 's' }}
+                              </span>
+                            </button>
+
+                            <!-- Scene nodes -->
+                            @if (!isSceneCollapsed(group.sceneId)) {
+                              <div class="divide-y divide-border/40">
+                                @for (node of group.nodes; track node.nodeId) {
+                                  <div class="group/node px-4 py-3">
+
+                                    <!-- Node kind + status header -->
+                                    <div class="flex items-center gap-2 mb-2">
+                                      <div class="shrink-0">
+                                        @if (node.status === 'Succeeded') {
+                                          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/15 text-green-500">
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                            </svg>
+                                          </div>
+                                        } @else if (node.status === 'Failed') {
+                                          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-destructive/15 text-destructive">
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                            </svg>
+                                          </div>
+                                        } @else if (node.status === 'Running') {
+                                          <div class="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary"></div>
+                                        } @else if (node.status === 'Blocked') {
+                                          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/15 text-orange-500">
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                                            </svg>
+                                          </div>
+                                        } @else {
+                                          <div class="h-5 w-5 rounded-full bg-muted"></div>
+                                        }
+                                      </div>
+
+                                      <span class="font-mono text-xs font-medium text-foreground">
+                                        @if (node.kind === 'VoicePromptBatch') { Dialogue Batch }
+                                        @else if (node.kind === 'ActionElement') { Action }
+                                        @else if (node.kind === 'VoiceOverElement') { Voice Over }
+                                        @else { {{ node.kind }} }
+                                      </span>
+
+                                      <span [class]="'font-mono text-[10px] ' + getNodeStatusColor(node.status)">
+                                        {{ node.status }}
+                                      </span>
+
+                                      @if (node.retryCount > 0) {
+                                        <span class="font-mono text-[10px] text-muted-foreground/60">
+                                          {{ node.retryCount }} {{ node.retryCount === 1 ? 'retry' : 'retries' }}
+                                        </span>
+                                      }
+
+                                      <!-- Hover action buttons -->
+                                      <div class="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/node:opacity-100">
+                                        @if (node.status === 'Succeeded') {
+                                          <button type="button" (click)="playNodeDetail(node.nodeId, node.elementIds); $event.stopPropagation()"
+                                            class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-green-500/10 hover:text-green-500"
+                                            aria-label="Play this node">
+                                            <svg class="h-3 w-3 ml-px" fill="currentColor" viewBox="0 0 24 24">
+                                              <path d="M8 5.14v14l11-7-11-7z" />
+                                            </svg>
+                                          </button>
+                                        }
+                                        @if (node.status !== 'Running') {
+                                          <button type="button" (click)="regenerateNode(node.nodeId); $event.stopPropagation()"
+                                            class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 transition-colors hover:bg-accent hover:text-foreground"
+                                            aria-label="Regenerate this node">
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                                            </svg>
+                                          </button>
+                                        }
+                                      </div>
+                                    </div>
+
+                                    @if (node.lastError) {
+                                      <p class="mb-2 rounded-md bg-destructive/10 px-2 py-1 font-mono text-[10px] text-destructive leading-snug">
+                                        {{ node.lastError }}
+                                      </p>
+                                    }
+
+                                    <!-- VoicePromptBatch: per-line character + voice info -->
+                                    @if (node.kind === 'VoicePromptBatch' && node.lines.length > 0) {
+                                      <div class="space-y-2 pl-7">
+                                        @for (line of node.lines; track line.elementId) {
+                                          @if (line.type === 'Dialogue' || line.type === 'VoiceOver') {
+                                            <div class="rounded-lg border border-border/60 bg-background/50 px-3 py-2">
+                                              <div class="flex flex-wrap items-center gap-2 mb-1">
+                                                @if (line.characterName) {
+                                                  <span class="font-mono text-[11px] font-bold uppercase tracking-wide text-char-cue">
+                                                    {{ line.characterName }}
+                                                    @if (line.type === 'VoiceOver') {
+                                                      <span class="font-normal text-vo-text/70">&nbsp;(V.O.)</span>
+                                                    }
+                                                  </span>
+                                                }
+                                                @if (line.voiceName) {
+                                                  <span class="group/voice relative">
+                                                    <span class="cursor-default rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary/80">
+                                                      {{ line.voiceName }}
+                                                    </span>
+                                                    @if (line.voiceDescription) {
+                                                      <span class="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 w-56 rounded-lg border border-border bg-card px-2.5 py-2 font-mono text-[10px] italic leading-snug text-muted-foreground shadow-lg opacity-0 transition-opacity group-hover/voice:opacity-100">
+                                                        {{ line.voiceDescription }}
+                                                      </span>
+                                                    }
+                                                  </span>
+                                                }
+                                              </div>
+                                              <p class="font-mono text-xs leading-relaxed text-dialogue-text">{{ line.text }}</p>
+                                            </div>
+                                          } @else if (line.type === 'Parenthetical') {
+                                            <p class="pl-2 font-mono text-xs text-paren-text italic">{{ line.text }}</p>
+                                          }
+                                        }
+                                      </div>
+                                    }
+
+                                    <!-- ActionElement / VoiceOverElement: narrator voice + text -->
+                                    @if (node.kind === 'ActionElement' || node.kind === 'VoiceOverElement') {
+                                      <div class="pl-7 space-y-1.5">
+                                        @if (node.voiceName) {
+                                          <div class="flex flex-wrap items-center gap-2">
+                                            <span class="group/voice relative">
+                                              <span class="cursor-default rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary/80">
+                                                {{ node.voiceName }}
+                                              </span>
+                                              @if (node.voiceDescription) {
+                                                <span class="pointer-events-none absolute bottom-full left-0 z-20 mb-1.5 w-56 rounded-lg border border-border bg-card px-2.5 py-2 font-mono text-[10px] italic leading-snug text-muted-foreground shadow-lg opacity-0 transition-opacity group-hover/voice:opacity-100">
+                                                  {{ node.voiceDescription }}
+                                                </span>
+                                              }
+                                            </span>
+                                          </div>
+                                        }
+                                        @if (node.text) {
+                                          <p [class]="'font-mono text-xs leading-relaxed '
+                                            + (node.kind === 'VoiceOverElement' ? 'italic text-vo-text' : 'text-action-text')">
+                                            {{ node.text }}
+                                          </p>
+                                        }
+                                      </div>
+                                    }
+
+                                  </div>
+                                }
+                              </div>
+                            }
+
+                          }
+                        </div>
+                      }
+                    }
+                  }
+
+                </div>
+              }
+            </div>
+          }
+
+        </div>
+      }
+
       <!-- Scene content -->
+      @if (activeTab() === 'screenplay') {
       <div class="vertical-scroll flex-1 overflow-y-auto">
         @for (scene of scenes(); track scene.id; let i = $index) {
           <article [id]="'scene-' + i" class="border-b border-border/50 min-h-[40vh]">
@@ -279,69 +664,167 @@
 
             <!-- Elements -->
             <div class="flex flex-col items-center px-3 py-3 sm:px-6 sm:py-4">
-              @for (el of scene.elements; track el.id; let j = $index) {
-                @if (el.character && (el.type === 'Dialogue' || el.type === 'VoiceOver')) {
-                  @if (j === 0 || scene.elements[j - 1].character !== el.character || (scene.elements[j - 1].type !== 'Dialogue' && scene.elements[j - 1].type !== 'VoiceOver' && scene.elements[j - 1].type !== 'Parenthetical')) {
-                    <div class="mb-1 mt-4 ml-10 w-full max-w-[540px] font-mono text-xs font-bold uppercase tracking-widest text-char-cue sm:ml-20">
-                      {{ el.character }}
-                      @if (el.type === 'VoiceOver') {
-                        <span class="ml-1 text-vo-text/70">(V.O.)</span>
+              @for (block of getSceneBlocks(scene); track $index) {
+                @if (block.kind === 'VoicePromptBatch' && block.nodeId) {
+                  <div [class]="'gen-block group '
+                    + (block.status === 'succeeded' ? 'gen-block-succeeded' :
+                       block.status === 'running' ? 'gen-block-running' :
+                       block.status === 'failed' ? 'gen-block-failed' :
+                       block.status === 'pending' ? 'gen-block-pending' : '')"
+                    [class.gen-block-audio-active]="audioPlayback.isNodeActive(block.nodeId!)">
+
+                    @if (block.status === 'succeeded') {
+                      <button type="button" (click)="playBatchNode(block.nodeId!)"
+                        [class]="'absolute -left-7 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full transition-all '
+                          + (audioPlayback.isNodeActive(block.nodeId!)
+                            ? 'bg-green-500/20 text-green-500'
+                            : 'text-muted-foreground/0 group-hover:text-muted-foreground/50 hover:!text-green-500 hover:!bg-green-500/10')"
+                        aria-label="Play dialogue batch">
+                        @if (audioPlayback.isNodeActive(block.nodeId!) && audioPlayback.isPlaying()) {
+                          <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                          </svg>
+                        } @else {
+                          <svg class="h-2.5 w-2.5 ml-px" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5.14v14l11-7-11-7z" />
+                          </svg>
+                        }
+                      </button>
+                    }
+
+                    @if (block.status === 'failed') {
+                      <button type="button" (click)="regenerateNode(block.nodeId!)"
+                        class="absolute -left-7 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/10 text-destructive transition-all hover:bg-destructive/20"
+                        aria-label="Regenerate">
+                        <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                        </svg>
+                      </button>
+                    }
+
+                    @for (entry of block.elements; track entry.element.id) {
+                      @if (entry.showCharCue) {
+                        <div class="mb-1 mt-4 ml-6 w-full font-mono text-xs font-bold uppercase tracking-widest text-char-cue sm:ml-12">
+                          {{ entry.element.character }}
+                          @if (entry.isVoiceOver) {
+                            <span class="ml-1 text-vo-text/70">(V.O.)</span>
+                          }
+                        </div>
                       }
-                    </div>
-                  }
+
+                      <div class="relative w-full"
+                        [attr.data-element-id]="entry.element.id">
+                        @switch (entry.element.type) {
+                          @case ('Dialogue') {
+                            <div class="my-1 ml-4 max-w-[320px] font-mono text-sm leading-relaxed text-dialogue-text sm:ml-8 sm:max-w-[340px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('VoiceOver') {
+                            <div class="my-1 ml-4 max-w-[320px] font-mono text-sm italic leading-relaxed text-vo-text sm:ml-8 sm:max-w-[340px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('Parenthetical') {
+                            <div class="my-0.5 ml-8 max-w-[220px] font-mono text-sm text-paren-text sm:ml-16 sm:max-w-[260px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @default {
+                            <div class="my-2 w-full font-mono text-sm text-muted-foreground">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <div class="contents">
+
+                    @for (entry of block.elements; track entry.element.id) {
+                      @if (entry.showCharCue) {
+                        <div class="mb-1 mt-4 ml-10 w-full max-w-[540px] font-mono text-xs font-bold uppercase tracking-widest text-char-cue sm:ml-20">
+                          {{ entry.element.character }}
+                          @if (entry.isVoiceOver) {
+                            <span class="ml-1 text-vo-text/70">(V.O.)</span>
+                          }
+                        </div>
+                      }
+
+                      <div class="group relative w-full max-w-[540px]"
+                        [attr.data-element-id]="entry.element.id"
+                        [class.el-gen-pending]="getElementStatus(entry.element.id) === 'pending'"
+                        [class.el-gen-running]="getElementStatus(entry.element.id) === 'running'"
+                        [class.el-gen-succeeded]="getElementStatus(entry.element.id) === 'succeeded'"
+                        [class.el-gen-failed]="getElementStatus(entry.element.id) === 'failed'"
+                        [class.el-audio-active]="audioPlayback.isElementActive(entry.element.id)">
+
+                        @switch (entry.element.type) {
+                          @case ('Action') {
+                            <div class="my-3 w-full font-mono text-sm leading-relaxed text-action-text">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('Dialogue') {
+                            <div class="my-1 ml-8 max-w-[320px] font-mono text-sm leading-relaxed text-dialogue-text sm:ml-16 sm:max-w-[340px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('VoiceOver') {
+                            <div class="my-1 ml-8 max-w-[320px] font-mono text-sm italic leading-relaxed text-vo-text sm:ml-16 sm:max-w-[340px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('Parenthetical') {
+                            <div class="my-0.5 ml-12 max-w-[220px] font-mono text-sm text-paren-text sm:ml-24 sm:max-w-[260px]">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @case ('Transition') {
+                            <div class="my-4 w-full text-right font-mono text-sm font-bold uppercase text-transition-text">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                          @default {
+                            <div class="my-2 w-full font-mono text-sm text-muted-foreground">
+                              {{ entry.element.text }}
+                            </div>
+                          }
+                        }
+
+                        @if (canPlayElement(entry.element.id)) {
+                          <button type="button" (click)="playNode(entry.element.id)"
+                            [class]="'absolute -left-7 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full transition-all '
+                              + (audioPlayback.isElementActive(entry.element.id)
+                                ? 'bg-green-500/20 text-green-500'
+                                : 'text-muted-foreground/0 group-hover:text-muted-foreground/50 hover:!text-green-500 hover:!bg-green-500/10')"
+                            aria-label="Play this element">
+                            @if (audioPlayback.isElementActive(entry.element.id) && audioPlayback.isPlaying()) {
+                              <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                              </svg>
+                            } @else {
+                              <svg class="h-2.5 w-2.5 ml-px" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5.14v14l11-7-11-7z" />
+                              </svg>
+                            }
+                          </button>
+                        }
+
+                        @if (getElementStatus(entry.element.id) === 'failed' && getNodeIdForElement(entry.element.id); as nid) {
+                          <button type="button" (click)="regenerateNode(nid)"
+                            class="absolute -left-7 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/10 text-destructive transition-all hover:bg-destructive/20"
+                            aria-label="Regenerate">
+                            <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                            </svg>
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
                 }
-
-                <!-- Element with generation indicator -->
-                <div class="group relative w-full max-w-[540px]"
-                  [class.el-gen-pending]="getElementStatus(el.id) === 'pending'"
-                  [class.el-gen-running]="getElementStatus(el.id) === 'running'"
-                  [class.el-gen-succeeded]="getElementStatus(el.id) === 'succeeded'"
-                  [class.el-gen-failed]="getElementStatus(el.id) === 'failed'">
-
-                  @switch (el.type) {
-                    @case ('Action') {
-                      <div class="my-3 w-full font-mono text-sm leading-relaxed text-action-text">
-                        {{ el.text }}
-                      </div>
-                    }
-                    @case ('Dialogue') {
-                      <div class="my-1 ml-8 max-w-[320px] font-mono text-sm leading-relaxed text-dialogue-text sm:ml-16 sm:max-w-[340px]">
-                        {{ el.text }}
-                      </div>
-                    }
-                    @case ('VoiceOver') {
-                      <div class="my-1 ml-8 max-w-[320px] font-mono text-sm italic leading-relaxed text-vo-text sm:ml-16 sm:max-w-[340px]">
-                        {{ el.text }}
-                      </div>
-                    }
-                    @case ('Parenthetical') {
-                      <div class="my-0.5 ml-12 max-w-[220px] font-mono text-sm text-paren-text sm:ml-24 sm:max-w-[260px]">
-                        {{ el.text }}
-                      </div>
-                    }
-                    @case ('Transition') {
-                      <div class="my-4 w-full text-right font-mono text-sm font-bold uppercase text-transition-text">
-                        {{ el.text }}
-                      </div>
-                    }
-                    @default {
-                      <div class="my-2 w-full font-mono text-sm text-muted-foreground">
-                        {{ el.text }}
-                      </div>
-                    }
-                  }
-
-                  <!-- Regenerate button for failed elements -->
-                  @if (getElementStatus(el.id) === 'failed' && getNodeIdForElement(el.id); as nid) {
-                    <button type="button" (click)="regenerateNode(nid)"
-                      class="absolute -left-7 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/10 text-destructive transition-all hover:bg-destructive/20"
-                      aria-label="Regenerate">
-                      <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-                      </svg>
-                    </button>
-                  }
-                </div>
               }
             </div>
           </article>
@@ -374,48 +857,108 @@
 
         <div class="h-[30vh]"></div>
       </div>
+      } <!-- end @if activeTab === 'screenplay' -->
 
       <!-- Bottom bar -->
       <nav class="relative flex items-center border-t border-border bg-background px-4 py-2 sm:px-6">
-        <span class="font-mono text-xs text-muted-foreground">
-          @if (scenes().length > 0) {
-            {{ scenes().length }} scenes loaded
-          } @else {
-            Waiting for data…
-          }
-        </span>
+        <div class="flex items-center gap-3">
+          <span class="hidden font-mono text-xs text-muted-foreground sm:inline">
+            @if (scenes().length > 0) {
+              {{ scenes().length }} scenes loaded
+            } @else {
+              Waiting for data…
+            }
+          </span>
+          <!-- Mobile nav tabs -->
+          <button type="button" (click)="switchTab('screenplay')"
+            [class]="'flex h-7 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-[11px] transition-colors lg:hidden '
+              + (activeTab() === 'screenplay' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground')"
+            aria-label="Show script">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+            Script
+          </button>
+          <button type="button" (click)="switchTab('generation')"
+            [class]="'flex h-7 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-[11px] transition-colors lg:hidden '
+              + (activeTab() === 'generation' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground')"
+            aria-label="Show generation history">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+            </svg>
+            Generation
+          </button>
+        </div>
 
-        <!-- Mobile generate button — absolutely centered -->
+        <!-- Mobile generate/play button — absolutely centered -->
         <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:hidden">
           <div class="relative">
             @if (isGenerating()) {
               <div class="generate-ring-spin absolute -inset-1.5 rounded-full border-2 border-transparent border-t-primary"></div>
             }
-            <button type="button"
-              (click)="isGenerating() ? toggleProgressPopup() : startGeneration()"
-              [disabled]="generationStatus() === 'starting'"
-              [class]="'relative flex h-10 w-10 items-center justify-center rounded-full transition-all '
-                + (generationStatus() === 'completed' ? 'bg-green-600 text-white' :
-                   generationStatus() === 'failed' ? 'bg-destructive text-destructive-foreground' :
-                   'bg-primary text-primary-foreground hover:bg-primary/90')
-                + (generationStatus() === 'starting' ? ' opacity-60' : '')"
-              [attr.aria-label]="isGenerating() ? 'View progress' : 'Generate audio'">
-              @if (generationStatus() === 'starting') {
-                <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
-              } @else if (generationStatus() === 'completed') {
-                <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            @if (audioPlayback.isPlaying() || audioPlayback.state() === 'loading') {
+              <div class="audio-pulse-ring absolute -inset-1.5 rounded-full border-2 border-green-500/40 animate-pulse"></div>
+            }
+
+            @if (hasGeneratedContent() && !isGenerating()) {
+              <button type="button"
+                (click)="togglePlayPause()"
+                [class]="'relative flex h-10 w-10 items-center justify-center rounded-full transition-all '
+                  + (audioPlayback.isPlaying() || audioPlayback.state() === 'loading'
+                    ? 'bg-green-600 text-white shadow-lg shadow-green-600/25 hover:bg-green-700'
+                    : audioPlayback.state() === 'paused'
+                      ? 'bg-green-600/80 text-white hover:bg-green-600'
+                      : 'bg-green-600 text-white hover:bg-green-700')"
+                [attr.aria-label]="audioPlayback.isPlaying() ? 'Pause playback' : 'Play generated audio'">
+                @if (audioPlayback.state() === 'loading') {
+                  <div class="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
+                } @else if (audioPlayback.isPlaying()) {
+                  <svg class="h-4.5 w-4.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                } @else {
+                  <svg class="h-4.5 w-4.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v14l11-7-11-7z" />
+                  </svg>
+                }
+              </button>
+            } @else {
+              <button type="button"
+                (click)="isGenerating() ? toggleProgressPopup() : canContinueGeneration() ? continueGeneration() : startGeneration()"
+                [disabled]="generationStatus() === 'starting'"
+                [class]="'relative flex h-10 w-10 items-center justify-center rounded-full transition-all '
+                  + (generationStatus() === 'failed' && !canContinueGeneration() ? 'bg-destructive text-destructive-foreground' :
+                     'bg-primary text-primary-foreground hover:bg-primary/90')
+                  + (generationStatus() === 'starting' ? ' opacity-60' : '')"
+                [attr.aria-label]="isGenerating() ? 'View progress' : canContinueGeneration() ? 'Continue generation' : 'Generate audio'">
+                @if (generationStatus() === 'starting') {
+                  <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground"></div>
+                } @else if (generationStatus() === 'failed' && !canContinueGeneration()) {
+                  <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                } @else if (canContinueGeneration()) {
+                  <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                  </svg>
+                } @else {
+                  <svg class="h-4.5 w-4.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5.14v14l11-7-11-7z" />
+                  </svg>
+                }
+              </button>
+            }
+
+            <!-- Stop button — absolutely positioned to avoid shifting the play button -->
+            @if (audioPlayback.isActive()) {
+              <button type="button" (click)="stopPlayback()"
+                class="absolute -right-9 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Stop playback">
+                <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 6h12v12H6z" />
                 </svg>
-              } @else if (generationStatus() === 'failed') {
-                <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-              } @else {
-                <svg class="h-4.5 w-4.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5.14v14l11-7-11-7z" />
-                </svg>
-              }
-            </button>
+              </button>
+            }
           </div>
         </div>
 

@@ -10,11 +10,16 @@ service ContentGenerationService {
   rpc ReplayRun (ReplayRunRequest) returns (ReplayRunResponse);
   rpc RegenerateNode (RegenerateNodeRequest) returns (RegenerateNodeResponse);
   rpc GetRunStatus (GetRunStatusRequest) returns (GetRunStatusResponse);
+  rpc GetLatestRunForScreenplay (GetLatestRunForScreenplayRequest) returns (GetRunStatusResponse);
+  rpc GetNodeAudio (GetNodeAudioRequest) returns (GetNodeAudioResponse);
   rpc StreamRunStatus (StreamRunStatusRequest) returns (stream RunStatusUpdate);
+  rpc ListRunsForScreenplay (ListRunsForScreenplayRequest) returns (ListRunsForScreenplayResponse);
+  rpc GetRunDetails (GetRunDetailsRequest) returns (GetRunDetailsResponse);
 }
 
 message StartRunRequest {
   string screenplay_id = 1;
+  bool cancel_active = 2;
 }
 
 message StartRunResponse {
@@ -72,4 +77,74 @@ message GetRunStatusResponse {
   string status = 4;
   string error_message = 5;
   repeated GenerationNodeStatusMessage nodes = 6;
+}
+
+message GetLatestRunForScreenplayRequest {
+  string screenplay_id = 1;
+}
+
+message GetNodeAudioRequest {
+  string node_id = 1;
+}
+
+message GetNodeAudioResponse {
+  string audio_base64 = 1;
+  string audio_format = 2;
+  string mime_type = 3;
+}
+
+message RunSummary {
+  string run_id = 1;
+  string status = 2;
+  string phase = 3;
+  string created_at = 4;
+  int32 total_nodes = 5;
+  int32 succeeded_nodes = 6;
+  int32 failed_nodes = 7;
+}
+
+message ListRunsForScreenplayRequest {
+  string screenplay_id = 1;
+}
+
+message ListRunsForScreenplayResponse {
+  repeated RunSummary runs = 1;
+}
+
+message NodeLineDetail {
+  string element_id = 1;
+  string character_name = 2;
+  string type = 3;
+  string text = 4;
+  string voice_name = 5;
+  string voice_description = 6;
+}
+
+message GenerationNodeDetail {
+  string node_id = 1;
+  string kind = 2;
+  string status = 3;
+  int32 retry_count = 4;
+  string last_error = 5;
+  string scene_id = 6;
+  repeated string element_ids = 7;
+  string voice_name = 8;
+  string voice_description = 9;
+  string character_name = 10;
+  string text = 11;
+  repeated NodeLineDetail lines = 12;
+}
+
+message GetRunDetailsRequest {
+  string run_id = 1;
+}
+
+message GetRunDetailsResponse {
+  string run_id = 1;
+  string screenplay_id = 2;
+  string phase = 3;
+  string status = 4;
+  string error_message = 5;
+  string created_at = 6;
+  repeated GenerationNodeDetail nodes = 7;
 }

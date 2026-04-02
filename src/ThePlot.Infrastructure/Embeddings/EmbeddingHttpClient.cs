@@ -9,9 +9,9 @@ public sealed class EmbeddingHttpClient(HttpClient httpClient, IConfiguration co
 {
     private const string ConnectionStringName = "embedding-server";
 
-    public async Task<float[]> GetEmbeddingAsync(string text, int dimensions = 1024, CancellationToken ct = default)
+    public async Task<float[]> GetEmbeddingAsync(string text, int? dimensions = null, CancellationToken ct = default)
     {
-        var (endpoint, key) = ParseConnectionString(configuration.GetConnectionString(ConnectionStringName));
+        var (endpoint, key, model) = ParseConnectionString(configuration.GetConnectionString(ConnectionStringName));
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             throw new InvalidOperationException($"Missing connection string '{ConnectionStringName}'.");
@@ -20,9 +20,13 @@ public sealed class EmbeddingHttpClient(HttpClient httpClient, IConfiguration co
         var payload = new Dictionary<string, object?>
         {
             ["input"] = text,
-            ["model"] = configuration["Embedding:Model"] ?? "text-embedding",
-            ["dimensions"] = dimensions,
+            ["model"] = model ?? configuration["Embedding:Model"] ?? "text-embedding",
         };
+
+        if (dimensions.HasValue)
+        {
+            payload["dimensions"] = dimensions.Value;
+        }
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
@@ -68,15 +72,16 @@ public sealed class EmbeddingHttpClient(HttpClient httpClient, IConfiguration co
         return result;
     }
 
-    private static (string Endpoint, string Key) ParseConnectionString(string? connectionString)
+    private static (string Endpoint, string Key, string? Model) ParseConnectionString(string? connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            return (string.Empty, string.Empty);
+            return (string.Empty, string.Empty, null);
         }
 
         var endpoint = string.Empty;
         var key = string.Empty;
+        string? model = null;
 
         foreach (var segment in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
@@ -94,8 +99,12 @@ public sealed class EmbeddingHttpClient(HttpClient httpClient, IConfiguration co
             {
                 key = parts[1];
             }
+            else if (parts[0].Equals("Model", StringComparison.OrdinalIgnoreCase))
+            {
+                model = parts[1];
+            }
         }
 
-        return (endpoint, key);
+        return (endpoint, key, model);
     }
 }

@@ -254,6 +254,92 @@ export class ContentGenerationServiceClient {
     this.methodDescriptorGetRunStatus);
   }
 
+  methodDescriptorGetLatestRunForScreenplay = new grpcWeb.MethodDescriptor(
+    '/content_generation.ContentGenerationService/GetLatestRunForScreenplay',
+    grpcWeb.MethodType.UNARY,
+    content_generation_pb.GetLatestRunForScreenplayRequest,
+    content_generation_pb.GetRunStatusResponse,
+    (request: content_generation_pb.GetLatestRunForScreenplayRequest) => {
+      return request.serializeBinary();
+    },
+    content_generation_pb.GetRunStatusResponse.deserializeBinary
+  );
+
+  getLatestRunForScreenplay(
+    request: content_generation_pb.GetLatestRunForScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<content_generation_pb.GetRunStatusResponse>;
+
+  getLatestRunForScreenplay(
+    request: content_generation_pb.GetLatestRunForScreenplayRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetRunStatusResponse) => void): grpcWeb.ClientReadableStream<content_generation_pb.GetRunStatusResponse>;
+
+  getLatestRunForScreenplay(
+    request: content_generation_pb.GetLatestRunForScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetRunStatusResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/content_generation.ContentGenerationService/GetLatestRunForScreenplay',
+        request,
+        metadata || {},
+        this.methodDescriptorGetLatestRunForScreenplay,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/content_generation.ContentGenerationService/GetLatestRunForScreenplay',
+    request,
+    metadata || {},
+    this.methodDescriptorGetLatestRunForScreenplay);
+  }
+
+  methodDescriptorGetNodeAudio = new grpcWeb.MethodDescriptor(
+    '/content_generation.ContentGenerationService/GetNodeAudio',
+    grpcWeb.MethodType.UNARY,
+    content_generation_pb.GetNodeAudioRequest,
+    content_generation_pb.GetNodeAudioResponse,
+    (request: content_generation_pb.GetNodeAudioRequest) => {
+      return request.serializeBinary();
+    },
+    content_generation_pb.GetNodeAudioResponse.deserializeBinary
+  );
+
+  getNodeAudio(
+    request: content_generation_pb.GetNodeAudioRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<content_generation_pb.GetNodeAudioResponse>;
+
+  getNodeAudio(
+    request: content_generation_pb.GetNodeAudioRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetNodeAudioResponse) => void): grpcWeb.ClientReadableStream<content_generation_pb.GetNodeAudioResponse>;
+
+  getNodeAudio(
+    request: content_generation_pb.GetNodeAudioRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetNodeAudioResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/content_generation.ContentGenerationService/GetNodeAudio',
+        request,
+        metadata || {},
+        this.methodDescriptorGetNodeAudio,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/content_generation.ContentGenerationService/GetNodeAudio',
+    request,
+    metadata || {},
+    this.methodDescriptorGetNodeAudio);
+  }
+
   methodDescriptorStreamRunStatus = new grpcWeb.MethodDescriptor(
     '/content_generation.ContentGenerationService/StreamRunStatus',
     grpcWeb.MethodType.SERVER_STREAMING,
@@ -274,6 +360,92 @@ export class ContentGenerationServiceClient {
       request,
       metadata || {},
       this.methodDescriptorStreamRunStatus);
+  }
+
+  methodDescriptorListRunsForScreenplay = new grpcWeb.MethodDescriptor(
+    '/content_generation.ContentGenerationService/ListRunsForScreenplay',
+    grpcWeb.MethodType.UNARY,
+    content_generation_pb.ListRunsForScreenplayRequest,
+    content_generation_pb.ListRunsForScreenplayResponse,
+    (request: content_generation_pb.ListRunsForScreenplayRequest) => {
+      return request.serializeBinary();
+    },
+    content_generation_pb.ListRunsForScreenplayResponse.deserializeBinary
+  );
+
+  listRunsForScreenplay(
+    request: content_generation_pb.ListRunsForScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<content_generation_pb.ListRunsForScreenplayResponse>;
+
+  listRunsForScreenplay(
+    request: content_generation_pb.ListRunsForScreenplayRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: content_generation_pb.ListRunsForScreenplayResponse) => void): grpcWeb.ClientReadableStream<content_generation_pb.ListRunsForScreenplayResponse>;
+
+  listRunsForScreenplay(
+    request: content_generation_pb.ListRunsForScreenplayRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: content_generation_pb.ListRunsForScreenplayResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/content_generation.ContentGenerationService/ListRunsForScreenplay',
+        request,
+        metadata || {},
+        this.methodDescriptorListRunsForScreenplay,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/content_generation.ContentGenerationService/ListRunsForScreenplay',
+    request,
+    metadata || {},
+    this.methodDescriptorListRunsForScreenplay);
+  }
+
+  methodDescriptorGetRunDetails = new grpcWeb.MethodDescriptor(
+    '/content_generation.ContentGenerationService/GetRunDetails',
+    grpcWeb.MethodType.UNARY,
+    content_generation_pb.GetRunDetailsRequest,
+    content_generation_pb.GetRunDetailsResponse,
+    (request: content_generation_pb.GetRunDetailsRequest) => {
+      return request.serializeBinary();
+    },
+    content_generation_pb.GetRunDetailsResponse.deserializeBinary
+  );
+
+  getRunDetails(
+    request: content_generation_pb.GetRunDetailsRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<content_generation_pb.GetRunDetailsResponse>;
+
+  getRunDetails(
+    request: content_generation_pb.GetRunDetailsRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetRunDetailsResponse) => void): grpcWeb.ClientReadableStream<content_generation_pb.GetRunDetailsResponse>;
+
+  getRunDetails(
+    request: content_generation_pb.GetRunDetailsRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: content_generation_pb.GetRunDetailsResponse) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/content_generation.ContentGenerationService/GetRunDetails',
+        request,
+        metadata || {},
+        this.methodDescriptorGetRunDetails,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/content_generation.ContentGenerationService/GetRunDetails',
+    request,
+    metadata || {},
+    this.methodDescriptorGetRunDetails);
   }
 
 }

@@ -103,6 +103,12 @@ public sealed class GenerationNode : IDateStamped
         ReleaseLease();
     }
 
+    public void MarkCancelled()
+    {
+        Status = GenerationNodeStatus.Cancelled;
+        ReleaseLease();
+    }
+
     public void MarkNeedsRetry(string message, DateTime runnableAfterUtc, int maxRetries)
     {
         RetryCount++;

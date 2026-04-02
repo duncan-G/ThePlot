@@ -223,3 +223,59 @@ button:disabled {
     0%, 100% { border-left-color: var(--primary); opacity: 1; }
     50% { border-left-color: color-mix(in srgb, var(--primary) 40%, transparent); opacity: 0.85; }
 }
+
+/* Active audio playback highlight */
+.el-audio-active {
+    border-left: 2px solid #22c55e;
+    padding-left: 8px;
+    background-color: color-mix(in srgb, #22c55e 5%, transparent);
+    border-radius: 2px;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Generation block view — wraps groups of elements belonging to a node */
+.gen-block {
+    position: relative;
+    width: 100%;
+    max-width: 540px;
+    border-left: 2px solid transparent;
+    border-radius: 2px;
+    padding: 2px 10px 6px;
+    margin: 4px 0;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.gen-block-succeeded {
+    border-left-color: transparent;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.gen-block-running {
+    border-left-color: var(--primary);
+    border-right-color: color-mix(in srgb, var(--primary) 12%, transparent);
+    background-color: color-mix(in srgb, var(--primary) 3%, transparent);
+    animation: gen-block-pulse 2s ease-in-out infinite;
+}
+
+.gen-block-failed {
+    border-left-color: var(--destructive);
+    border-right-color: color-mix(in srgb, var(--destructive) 12%, transparent);
+    background-color: color-mix(in srgb, var(--destructive) 3%, transparent);
+}
+
+.gen-block-pending {
+    border-left-color: var(--muted-foreground);
+    border-left-style: dotted;
+    opacity: 0.7;
+}
+
+@keyframes gen-block-pulse {
+    0%, 100% { border-left-color: var(--primary); opacity: 1; }
+    50% { border-left-color: color-mix(in srgb, var(--primary) 40%, transparent); opacity: 0.9; }
+}
+
+.gen-block-audio-active {
+    border-left-color: #22c55e;
+    background-color: color-mix(in srgb, #22c55e 8%, transparent);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}

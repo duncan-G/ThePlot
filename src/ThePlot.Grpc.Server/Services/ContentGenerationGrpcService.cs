@@ -2,6 +2,7 @@ using System.Text.Json;
 using Grpc.Core;
 using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.ContentGeneration;
+using ThePlot.Core.Voices;
 using ThePlot.Infrastructure;
 using ThePlot.Workers.ContentGeneration;
 
@@ -20,8 +21,18 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id."));
         }
 
-        var runId = await runService.StartRunAsync(screenplayId, context.CancellationToken);
-        return new StartRunResponse { RunId = runId.ToString() };
+        try
+        {
+            var runId = await runService.StartRunAsync(screenplayId, request.CancelActive, context.CancellationToken);
+            return new StartRunResponse { RunId = runId.ToString() };
+        }
+        catch (GenerationAlreadyActiveException ex)
+        {
+            var metadata = new Metadata { { "active_run_id", ex.ActiveRunId.ToString() } };
+            throw new RpcException(
+                new Status(StatusCode.AlreadyExists, ex.Message),
+                metadata);
+        }
     }
 
     public override async Task<CompleteVoiceDeterminationResponse> CompleteVoiceDetermination(
@@ -33,7 +44,7 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid run_id."));
         }
 
-        await runService.CompleteVoiceDeterminationAndStartContentGenerationAsync(runId, context.CancellationToken);
+        await runService.EnqueueVoiceDeterminationAsync(runId, context.CancellationToken);
         return new CompleteVoiceDeterminationResponse();
     }
 
@@ -81,15 +92,21 @@ public sealed class ContentGenerationGrpcService(
         var nodes = await db.GenerationNodes.AsNoTracking()
             .Where(n => n.GenerationRunId == runId)
             .OrderBy(n => n.DateCreated)
-            .Select(n => new GenerationNodeStatusMessage
+            .ToListAsync(context.CancellationToken);
+
+        var nodeMessages = nodes.Select(n =>
+        {
+            var msg = new GenerationNodeStatusMessage
             {
                 NodeId = n.Id.ToString(),
                 Kind = n.Kind.ToString(),
                 Status = n.Status.ToString(),
                 RetryCount = n.RetryCount,
                 LastError = n.LastErrorMessage ?? "",
-            })
-            .ToListAsync(context.CancellationToken);
+            };
+            ExtractPayloadInfo(n.Payload, msg);
+            return msg;
+        }).ToList();
 
         return new GetRunStatusResponse
         {
@@ -98,7 +115,86 @@ public sealed class ContentGenerationGrpcService(
             Phase = run.Phase.ToString(),
             Status = run.Status.ToString(),
             ErrorMessage = run.ErrorMessage ?? "",
-            Nodes = { nodes },
+            Nodes = { nodeMessages },
+        };
+    }
+
+    public override async Task<GetRunStatusResponse> GetLatestRunForScreenplay(
+        GetLatestRunForScreenplayRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ScreenplayId, out var screenplayId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id."));
+        }
+
+        var run = await db.GenerationRuns.AsNoTracking()
+            .Where(r => r.ScreenplayId == screenplayId)
+            .OrderByDescending(r => r.DateCreated)
+            .FirstOrDefaultAsync(context.CancellationToken);
+
+        if (run is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "No generation run found for this screenplay."));
+        }
+
+        var nodes = await db.GenerationNodes.AsNoTracking()
+            .Where(n => n.GenerationRunId == run.Id)
+            .OrderBy(n => n.DateCreated)
+            .ToListAsync(context.CancellationToken);
+
+        var nodeMessages = nodes.Select(n =>
+        {
+            var msg = new GenerationNodeStatusMessage
+            {
+                NodeId = n.Id.ToString(),
+                Kind = n.Kind.ToString(),
+                Status = n.Status.ToString(),
+                RetryCount = n.RetryCount,
+                LastError = n.LastErrorMessage ?? "",
+            };
+            ExtractPayloadInfo(n.Payload, msg);
+            return msg;
+        }).ToList();
+
+        return new GetRunStatusResponse
+        {
+            RunId = run.Id.ToString(),
+            ScreenplayId = run.ScreenplayId.ToString(),
+            Phase = run.Phase.ToString(),
+            Status = run.Status.ToString(),
+            ErrorMessage = run.ErrorMessage ?? "",
+            Nodes = { nodeMessages },
+        };
+    }
+
+    public override async Task<GetNodeAudioResponse> GetNodeAudio(
+        GetNodeAudioRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.NodeId, out var nodeId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid node_id."));
+        }
+
+        var artifact = await db.GeneratedArtifacts.AsNoTracking()
+            .Where(a => a.GenerationNodeId == nodeId && a.IsCurrent)
+            .FirstOrDefaultAsync(context.CancellationToken);
+
+        if (artifact?.Metadata is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "No audio artifact found for this node."));
+        }
+
+        var root = artifact.Metadata.RootElement;
+        var audioBase64 = root.TryGetProperty("AudioBase64", out var ab) ? ab.GetString() ?? "" : "";
+        var audioFormat = root.TryGetProperty("AudioFormat", out var af) ? af.GetString() ?? "" : "";
+
+        return new GetNodeAudioResponse
+        {
+            AudioBase64 = audioBase64,
+            AudioFormat = audioFormat,
+            MimeType = artifact.MimeType ?? $"audio/{audioFormat}",
         };
     }
 
@@ -184,6 +280,211 @@ public sealed class ContentGenerationGrpcService(
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2), context.CancellationToken);
+        }
+    }
+
+    public override async Task<ListRunsForScreenplayResponse> ListRunsForScreenplay(
+        ListRunsForScreenplayRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.ScreenplayId, out var screenplayId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id."));
+        }
+
+        var runs = await db.GenerationRuns.AsNoTracking()
+            .Where(r => r.ScreenplayId == screenplayId)
+            .OrderByDescending(r => r.DateCreated)
+            .ToListAsync(context.CancellationToken);
+
+        var runIds = runs.Select(r => r.Id).ToList();
+
+        var nodeCounts = await db.GenerationNodes.AsNoTracking()
+            .Where(n => runIds.Contains(n.GenerationRunId))
+            .GroupBy(n => n.GenerationRunId)
+            .Select(g => new
+            {
+                RunId = g.Key,
+                Total = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis),
+                Succeeded = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis && n.Status == GenerationNodeStatus.Succeeded),
+                Failed = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis && n.Status == GenerationNodeStatus.Failed),
+            })
+            .ToDictionaryAsync(x => x.RunId, context.CancellationToken);
+
+        var response = new ListRunsForScreenplayResponse();
+        foreach (var run in runs)
+        {
+            nodeCounts.TryGetValue(run.Id, out var counts);
+            response.Runs.Add(new RunSummary
+            {
+                RunId = run.Id.ToString(),
+                Status = run.Status.ToString(),
+                Phase = run.Phase.ToString(),
+                CreatedAt = run.DateCreated.ToString("O"),
+                TotalNodes = counts?.Total ?? 0,
+                SucceededNodes = counts?.Succeeded ?? 0,
+                FailedNodes = counts?.Failed ?? 0,
+            });
+        }
+
+        return response;
+    }
+
+    public override async Task<GetRunDetailsResponse> GetRunDetails(
+        GetRunDetailsRequest request,
+        ServerCallContext context)
+    {
+        if (!Guid.TryParse(request.RunId, out var runId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid run_id."));
+        }
+
+        var run = await db.GenerationRuns.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == runId, context.CancellationToken);
+
+        if (run is null)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Run not found."));
+        }
+
+        var nodes = await db.GenerationNodes.AsNoTracking()
+            .Where(n => n.GenerationRunId == runId)
+            .OrderBy(n => n.DateCreated)
+            .ToListAsync(context.CancellationToken);
+
+        // Collect all voiceIds referenced in node payloads.
+        var voiceIdSet = new HashSet<Guid>();
+        var characterIdSet = new HashSet<Guid>();
+        foreach (var node in nodes)
+        {
+            ExtractIdsFromPayload(node.Payload, voiceIdSet, characterIdSet);
+        }
+
+        var voiceMap = voiceIdSet.Count > 0
+            ? await db.Voices.AsNoTracking()
+                .Where(v => voiceIdSet.Contains(v.Id))
+                .ToDictionaryAsync(v => v.Id, context.CancellationToken)
+            : new Dictionary<Guid, Voice>();
+
+        var characterMap = characterIdSet.Count > 0
+            ? await db.Characters.AsNoTracking()
+                .Where(c => characterIdSet.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.Name, context.CancellationToken)
+            : new Dictionary<Guid, string>();
+
+        var response = new GetRunDetailsResponse
+        {
+            RunId = run.Id.ToString(),
+            ScreenplayId = run.ScreenplayId.ToString(),
+            Phase = run.Phase.ToString(),
+            Status = run.Status.ToString(),
+            ErrorMessage = run.ErrorMessage ?? "",
+            CreatedAt = run.DateCreated.ToString("O"),
+        };
+
+        foreach (var node in nodes)
+        {
+            var detail = BuildNodeDetail(node, voiceMap, characterMap);
+            response.Nodes.Add(detail);
+        }
+
+        return response;
+    }
+
+    private static GenerationNodeDetail BuildNodeDetail(
+        GenerationNode node,
+        Dictionary<Guid, Voice> voiceMap,
+        Dictionary<Guid, string> characterMap)
+    {
+        var detail = new GenerationNodeDetail
+        {
+            NodeId = node.Id.ToString(),
+            Kind = node.Kind.ToString(),
+            Status = node.Status.ToString(),
+            RetryCount = node.RetryCount,
+            LastError = node.LastErrorMessage ?? "",
+        };
+
+        if (node.Payload is null) return detail;
+
+        var root = node.Payload.RootElement;
+
+        if (root.TryGetProperty("sceneId", out var sceneId))
+        {
+            detail.SceneId = sceneId.GetString() ?? "";
+        }
+
+        if (root.TryGetProperty("lines", out var lines) && lines.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var line in lines.EnumerateArray())
+            {
+                var eid = line.TryGetProperty("elementId", out var e) ? e.GetString() ?? "" : "";
+                if (!string.IsNullOrEmpty(eid)) detail.ElementIds.Add(eid);
+
+                var lineDetail = new NodeLineDetail
+                {
+                    ElementId = eid,
+                    Type = line.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "",
+                    Text = line.TryGetProperty("text", out var tx) ? tx.GetString() ?? "" : "",
+                };
+
+                if (line.TryGetProperty("characterId", out var cid) && Guid.TryParse(cid.GetString(), out var characterId))
+                {
+                    lineDetail.CharacterName = characterMap.TryGetValue(characterId, out var cname) ? cname : "";
+                }
+
+                if (line.TryGetProperty("voiceId", out var vid) && Guid.TryParse(vid.GetString(), out var voiceId)
+                    && voiceMap.TryGetValue(voiceId, out var voice))
+                {
+                    lineDetail.VoiceName = voice.Name;
+                    lineDetail.VoiceDescription = voice.Description;
+                }
+
+                detail.Lines.Add(lineDetail);
+            }
+        }
+        else
+        {
+            if (root.TryGetProperty("elementId", out var elementId))
+            {
+                detail.ElementIds.Add(elementId.GetString() ?? "");
+            }
+
+            detail.Text = root.TryGetProperty("text", out var text) ? text.GetString() ?? "" : "";
+
+            if (root.TryGetProperty("voiceId", out var voiceIdProp) && Guid.TryParse(voiceIdProp.GetString(), out var vid)
+                && voiceMap.TryGetValue(vid, out var voice))
+            {
+                detail.VoiceName = voice.Name;
+                detail.VoiceDescription = voice.Description;
+            }
+        }
+
+        return detail;
+    }
+
+    private static void ExtractIdsFromPayload(
+        JsonDocument? payload,
+        HashSet<Guid> voiceIds,
+        HashSet<Guid> characterIds)
+    {
+        if (payload is null) return;
+        var root = payload.RootElement;
+
+        if (root.TryGetProperty("lines", out var lines) && lines.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var line in lines.EnumerateArray())
+            {
+                if (line.TryGetProperty("voiceId", out var vid) && Guid.TryParse(vid.GetString(), out var voiceId))
+                    voiceIds.Add(voiceId);
+                if (line.TryGetProperty("characterId", out var cid) && Guid.TryParse(cid.GetString(), out var characterId))
+                    characterIds.Add(characterId);
+            }
+        }
+        else
+        {
+            if (root.TryGetProperty("voiceId", out var vid) && Guid.TryParse(vid.GetString(), out var voiceId))
+                voiceIds.Add(voiceId);
         }
     }
 

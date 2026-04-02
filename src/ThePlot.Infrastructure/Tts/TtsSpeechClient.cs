@@ -1,10 +1,13 @@
+#pragma warning disable MEAI001
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 
 namespace ThePlot.Infrastructure.Tts;
 
-public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration configuration) : ITtsSpeechClient
+public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration configuration) : ITextToSpeechClient
 {
     private const string ConnectionStringName = "tts-server";
 
@@ -13,7 +16,13 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
     private const string DefaultVoiceDesignInstructions =
         "A clear, natural English voice with neutral, friendly tone, suitable for narration.";
 
-    public async Task<TtsSpeechResult> GetSpeechAsync(string userText, CancellationToken cancellationToken = default)
+    public TextToSpeechClientMetadata Metadata { get; } =
+        new("vllm", new Uri("https://github.com/vllm-project/vllm"), DefaultModel);
+
+    public async Task<TextToSpeechResponse> GetAudioAsync(
+        string inputText,
+        TextToSpeechOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
         var (endpoint, key) = ParseConnectionString(configuration.GetConnectionString(ConnectionStringName));
         if (string.IsNullOrWhiteSpace(endpoint))
@@ -22,12 +31,12 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
         }
 
         var taskType = configuration["Tts:TaskType"] ?? DefaultTaskType;
-        var model = configuration["Tts:Model"] ?? DefaultModel;
-        var responseFormat = configuration["Tts:ResponseFormat"] ?? "wav";
+        var model = options?.ModelId ?? configuration["Tts:Model"] ?? DefaultModel;
+        var responseFormat = options?.AudioFormat ?? configuration["Tts:ResponseFormat"] ?? "wav";
 
         var payload = new Dictionary<string, object?>
         {
-            ["input"] = userText,
+            ["input"] = inputText,
             ["model"] = model,
             ["response_format"] = responseFormat,
         };
@@ -47,7 +56,7 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
         else if (string.Equals(taskType, "CustomVoice", StringComparison.OrdinalIgnoreCase))
         {
             payload["task_type"] = "CustomVoice";
-            payload["voice"] = configuration["Tts:Voice"] ?? "vivian";
+            payload["voice"] = options?.VoiceId ?? configuration["Tts:Voice"] ?? "vivian";
             if (!payload.ContainsKey("language"))
             {
                 payload["language"] = "English";
@@ -76,9 +85,8 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
 
         if (!response.IsSuccessStatusCode)
         {
-            var detail = TryDecodeUtf8(bytes);
             throw new HttpRequestException(
-                $"TTS server returned {(int)response.StatusCode}: {detail}",
+                $"TTS server returned {(int)response.StatusCode}: {TryDecodeUtf8(bytes)}",
                 null,
                 response.StatusCode);
         }
@@ -88,30 +96,42 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
             throw new InvalidOperationException($"TTS server error: {TryDecodeUtf8(bytes)}");
         }
 
-        var format = AudioFormatFromResponse(responseFormat, response.Content.Headers.ContentType?.MediaType);
-        var audioB64 = Convert.ToBase64String(bytes);
+        var mediaType = AudioMediaTypeFromResponse(responseFormat, response.Content.Headers.ContentType?.MediaType);
 
-        return new TtsSpeechResult(
-            Text: userText,
-            AudioBase64: audioB64,
-            AudioFormat: format);
+        return new TextToSpeechResponse([new DataContent(bytes, mediaType)]);
     }
 
-    private static string AudioFormatFromResponse(string configuredFormat, string? mediaType)
+    public async IAsyncEnumerable<TextToSpeechResponseUpdate> GetStreamingAudioAsync(
+        string inputText,
+        TextToSpeechOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrEmpty(configuredFormat))
+        var response = await GetAudioAsync(inputText, options, cancellationToken);
+        foreach (var update in response.ToTextToSpeechResponseUpdates())
         {
-            return configuredFormat;
+            yield return update;
+        }
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null) =>
+        serviceKey is null && serviceType?.IsInstanceOfType(this) is true ? this : null;
+
+    public void Dispose() { }
+
+    private static string AudioMediaTypeFromResponse(string configuredFormat, string? mediaType)
+    {
+        if (!string.IsNullOrEmpty(mediaType))
+        {
+            return mediaType;
         }
 
-        return mediaType switch
+        return configuredFormat switch
         {
-            "audio/wav" => "wav",
-            "audio/mpeg" => "mp3",
-            "audio/flac" => "flac",
-            "audio/aac" => "aac",
-            "audio/opus" => "opus",
-            _ => "wav",
+            "mp3" => "audio/mpeg",
+            "flac" => "audio/flac",
+            "aac" => "audio/aac",
+            "opus" => "audio/opus",
+            _ => "audio/wav",
         };
     }
 
