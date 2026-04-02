@@ -10,17 +10,21 @@
   <ItemGroup>
     <ProjectReference Include="..\..\libs\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\ThePlot.Infrastructure\ThePlot.Infrastructure.csproj" />
+    <ProjectReference Include="..\ThePlot.Workers.ContentGeneration\ThePlot.Workers.ContentGeneration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="Protos\greet.proto" GrpcServices="Server" />
     <Protobuf Include="Protos\upload.proto" GrpcServices="Server" />
     <Protobuf Include="Protos\screenplay.proto" GrpcServices="Server" />
+    <Protobuf Include="Protos\content_generation.proto" GrpcServices="Server" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" Version="13.2.0" />
-    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.4.0" />
+    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.1-preview.1.26180.6" />
+    <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" Version="13.2.1" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.2.1" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.76.0" />
     <PackageReference Include="Grpc.AspNetCore.HealthChecks" Version="2.76.0" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.76.0" />

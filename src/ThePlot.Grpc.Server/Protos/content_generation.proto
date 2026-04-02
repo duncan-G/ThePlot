@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+option csharp_namespace = "ThePlot.Grpc.Server";
+
+package content_generation;
+
+service ContentGenerationService {
+  rpc StartRun (StartRunRequest) returns (StartRunResponse);
+  rpc CompleteVoiceDetermination (CompleteVoiceDeterminationRequest) returns (CompleteVoiceDeterminationResponse);
+  rpc ReplayRun (ReplayRunRequest) returns (ReplayRunResponse);
+  rpc RegenerateNode (RegenerateNodeRequest) returns (RegenerateNodeResponse);
+  rpc GetRunStatus (GetRunStatusRequest) returns (GetRunStatusResponse);
+  rpc StreamRunStatus (StreamRunStatusRequest) returns (stream RunStatusUpdate);
+}
+
+message StartRunRequest {
+  string screenplay_id = 1;
+}
+
+message StartRunResponse {
+  string run_id = 1;
+}
+
+message CompleteVoiceDeterminationRequest {
+  string run_id = 1;
+}
+
+message CompleteVoiceDeterminationResponse {}
+
+message ReplayRunRequest {
+  string run_id = 1;
+}
+
+message ReplayRunResponse {}
+
+message RegenerateNodeRequest {
+  string node_id = 1;
+}
+
+message RegenerateNodeResponse {}
+
+message GetRunStatusRequest {
+  string run_id = 1;
+}
+
+message GenerationNodeStatusMessage {
+  string node_id = 1;
+  string kind = 2;
+  string status = 3;
+  int32 retry_count = 4;
+  string last_error = 5;
+  repeated string element_ids = 6;
+  string scene_id = 7;
+}
+
+message StreamRunStatusRequest {
+  string run_id = 1;
+}
+
+message RunStatusUpdate {
+  string run_id = 1;
+  string run_status = 2;
+  string phase = 3;
+  string error_message = 4;
+  repeated GenerationNodeStatusMessage nodes = 5;
+}
+
+message GetRunStatusResponse {
+  string run_id = 1;
+  string screenplay_id = 2;
+  string phase = 3;
+  string status = 4;
+  string error_message = 5;
+  repeated GenerationNodeStatusMessage nodes = 6;
+}

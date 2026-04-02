@@ -101,15 +101,15 @@
 
     <!-- Desktop top bar -->
     <div class="hidden items-center gap-4 px-6 py-4 lg:flex">
-      <div class="relative max-w-xl flex-1">
-        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
-        <input type="text" placeholder="Search"
-          class="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50" />
-      </div>
-      <div class="flex-1"></div>
       @if (hasScreenplays()) {
+        <div class="relative max-w-xl flex-1">
+          <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input type="text" placeholder="Search"
+            class="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50" />
+        </div>
+        <div class="flex-1"></div>
         <button type="button" (click)="fileInput.click()" [disabled]="uploading() || importing()"
           class="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
           @if (uploading() || importing()) {
@@ -121,7 +121,7 @@
           }
         </button>
       }
-      <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
+      <div class="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
         <svg class="h-5 w-5 text-primary" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
         </svg>
@@ -129,40 +129,44 @@
     </div>
 
     <!-- Mobile search -->
-    <div class="px-4 pb-3 lg:hidden">
-      <div class="relative">
-        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
-        <input type="text" placeholder="Search"
-          class="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50" />
+    @if (hasScreenplays()) {
+      <div class="px-4 pb-3 lg:hidden">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input type="text" placeholder="Search"
+            class="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/50" />
+        </div>
       </div>
-    </div>
+    }
 
     <!-- Filter chips -->
-    <div class="flex items-center gap-2 px-4 pb-4 lg:px-6">
-      <button type="button"
-        class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs font-medium text-foreground">
-        All Scripts
-        <svg class="h-3 w-3 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-      <button type="button"
-        class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
-        Recent
-        <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-      <button type="button"
-        class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
-        Favorites
-        <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-    </div>
+    @if (hasScreenplays()) {
+      <div class="flex items-center gap-2 px-4 pb-4 lg:px-6">
+        <button type="button"
+          class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs font-medium text-foreground">
+          All Scripts
+          <svg class="h-3 w-3 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        <button type="button"
+          class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+          Recent
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+        <button type="button"
+          class="flex items-center gap-1.5 rounded-lg border border-border bg-secondary px-3.5 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+          Favorites
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        </button>
+      </div>
+    }
 
     <!-- Upload error banner -->
     @if (uploadError(); as err) {
@@ -216,7 +220,7 @@
               <div class="text-center">
                 <span class="text-sm text-foreground/80">Drop a PDF here or click to browse</span>
                 <br />
-                <span class="text-xs text-muted-foreground/60">PDF only · up to 50 MB</span>
+                <span class="text-xs text-muted-foreground/60">PDF only · up to 10 MB</span>
               </div>
             }
           </button>

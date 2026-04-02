@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 namespace ThePlot.AppHost.OpenTelemetryCollector;
 
 public static class OpenTelemetryCollectorResourceBuilderExtensions
 {
+    private const string DashboardOtlpUrlVariableName = "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL";
     private const string DashboardOtlpApiKeyVariableName = "AppHost:OtlpApiKey";
     private const string OtelConfigPath = "../otel-collector";
     private const int OtlpGrpcContainerPort = 4317;
@@ -32,13 +34,51 @@ public static class OpenTelemetryCollectorResourceBuilderExtensions
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithUrlForEndpoint(OpenTelemetryCollectorResource.OtlpHttpEndpointName, u => u.DisplayLocation = UrlDisplayLocation.DetailsOnly)
             .WithEnvironment("ASPIRE_API_KEY", otlpApiKey)
-            .WithEnvironment("ASPIRE_INSECURE", "true")
+            .WithEnvironment("ASPIRE_INSECURE", builder.ExecutionContext.IsPublishMode ? "false" : "true")
             .WithEnvironment("OTLP_GRPC_PORT", OtlpGrpcContainerPort.ToString())
             .WithEnvironment("OTLP_HTTP_PORT", OtlpHttpContainerPort.ToString())
             .WithOtlpExporter();
 
+        if (!builder.ExecutionContext.IsPublishMode)
+        {
+            resourceBuilder = resourceBuilder.WithContainerRuntimeArgs("--add-host=host.docker.internal:host-gateway");
+            if (TryBuildCollectorOtlpEndpointFromDashboardUrl(builder.Configuration, out var collectorOtlpEndpoint))
+            {
+                resourceBuilder = resourceBuilder.WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", collectorOtlpEndpoint);
+            }
+        }
+
         return resourceBuilder;
     }
+
+    /// <summary>
+    /// Derives the collector's OTLP export URL from <see cref="DashboardOtlpUrlVariableName"/>: dashboard may use
+    /// <c>0.0.0.0</c> (listen on all interfaces) but the collector must dial <c>host.docker.internal</c>; force
+    /// <c>https</c>; use authority only so the collector never sees a path like <c>...:21086/</c>.
+    /// </summary>
+    private static bool TryBuildCollectorOtlpEndpointFromDashboardUrl(IConfiguration configuration, out string collectorOtlpEndpoint)
+    {
+        collectorOtlpEndpoint = string.Empty;
+        var dashboardUrl = configuration[DashboardOtlpUrlVariableName];
+        if (string.IsNullOrWhiteSpace(dashboardUrl) || !Uri.TryCreate(dashboardUrl.Trim(), UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var uriBuilder = new UriBuilder(uri) { Scheme = Uri.UriSchemeHttps };
+        if (IsHostThatNeedsDockerInternalReplacement(uriBuilder.Host))
+        {
+            uriBuilder.Host = "host.docker.internal";
+        }
+
+        collectorOtlpEndpoint = uriBuilder.Uri.GetLeftPart(UriPartial.Authority);
+        return true;
+    }
+
+    private static bool IsHostThatNeedsDockerInternalReplacement(string host) =>
+        string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "[::]", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(host, "::", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Overrides <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> to route telemetry through the collector

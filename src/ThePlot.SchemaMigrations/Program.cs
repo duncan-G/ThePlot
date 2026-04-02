@@ -27,11 +27,20 @@ try
     if (rebuild)
     {
         var schema = dbContext.Model.GetDefaultSchema();
-        Console.WriteLine($"Rebuild requested. Dropping schema: {schema}...");
+        Console.WriteLine(
+            $"Rebuild requested. Dropping schema{(string.IsNullOrEmpty(schema) ? "" : $" \"{schema}\"")}, clearing __EFMigrationsHistory, then applying migrations...");
 
 #pragma warning disable EF1002
-        await dbContext.Database.ExecuteSqlRawAsync($@"
-            DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;");
+        if (!string.IsNullOrEmpty(schema))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $@"DROP TABLE IF EXISTS ""{schema}"".""__EFMigrationsHistory"";");
+            await dbContext.Database.ExecuteSqlRawAsync(
+                $@"DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;");
+        }
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            @"DROP TABLE IF EXISTS public.""__EFMigrationsHistory"";");
 #pragma warning restore EF1002
     }
 

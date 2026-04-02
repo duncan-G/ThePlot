@@ -264,9 +264,15 @@ flowchart TD
 
 **Software Requirements**
 - .NET 10
-- Node/npm
-- Docker
+- Node/npm lts
+- Docker Desktop
 - [Aspire CLI](https://aspire.dev/get-started/install-cli/)
+
+The application uses Qwen3 TTS locally. To run, you will need
+- Linux OS
+- GPU enabled computer
+- Docker Engine
+- [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 
 ```sh

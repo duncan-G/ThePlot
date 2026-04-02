@@ -188,3 +188,38 @@ button:disabled {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+/* Generate button ring spin */
+.generate-ring-spin {
+    animation: spin 1.2s linear infinite;
+    pointer-events: none;
+}
+
+/* Element generation status indicators — subtle left border */
+.el-gen-pending {
+    border-left: 2px solid transparent;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
+    border-left-color: var(--muted-foreground);
+    border-left-style: dotted;
+    padding-left: 8px;
+}
+.el-gen-running {
+    border-left: 2px solid var(--primary);
+    padding-left: 8px;
+    animation: el-border-pulse 1.5s ease-in-out infinite;
+}
+.el-gen-succeeded {
+    border-left: 2px solid transparent;
+    padding-left: 8px;
+    transition: border-color 0.5s ease;
+}
+.el-gen-failed {
+    border-left: 2px solid var(--destructive);
+    padding-left: 8px;
+    opacity: 0.85;
+}
+
+@keyframes el-border-pulse {
+    0%, 100% { border-left-color: var(--primary); opacity: 1; }
+    50% { border-left-color: color-mix(in srgb, var(--primary) 40%, transparent); opacity: 0.85; }
+}

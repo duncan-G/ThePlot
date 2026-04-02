@@ -22,6 +22,11 @@ public static class EnvoyProxyResourceBuilderExtensions
         {
             envoy.WithEndpoint("http", e => e.IsExternal = true);
         }
+        else 
+        {
+            envoy = envoy.WithContainerRuntimeArgs("--add-host=host.docker.internal:host-gateway");
+        }
+
         envoy
             .WithHttpEndpoint(targetPort: 9901, name: "admin", isProxied: false)
             .WithUrlForEndpoint("admin", u => u.DisplayText = "Envoy Admin")
@@ -74,7 +79,6 @@ public static class EnvoyProxyResourceBuilderExtensions
 
         return envoy;
     }
-
 
     public static IResourceBuilder<ContainerResource> WithCorsOriginSubdomainRegex(
         this IResourceBuilder<ContainerResource> envoy,

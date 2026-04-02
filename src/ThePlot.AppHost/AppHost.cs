@@ -4,6 +4,7 @@ using ThePlot.AppHost.ClientApp;
 using ThePlot.AppHost.EnvoyProxy;
 using ThePlot.AppHost.OpenTelemetryCollector;
 using ThePlot.AppHost.Postgres;
+using ThePlot.AppHost.VllmServer;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -14,6 +15,41 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 
 var otelCollector = builder.AddOpenTelemetryCollector("otel-collector");
+
+var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service")
+    .WithHttpEndpoint(name: "grpc")
+    .WithEndpoint("grpc", e =>
+    {
+        e.Transport = "http2";
+        if (!builder.ExecutionContext.IsPublishMode)
+        {
+            e.TargetHost = "0.0.0.0";
+        }
+    })
+    .WithOtlpCollectorReference(otelCollector);
+
+IResourceBuilder<IResourceWithConnectionString> ttsServer;
+IResourceBuilder<IResourceWithConnectionString> chatServer;
+IResourceBuilder<IResourceWithConnectionString> embedServer;
+
+if (builder.ExecutionContext.IsPublishMode)
+{
+    var foundry = builder.AddFoundry("ai-foundry");
+    ttsServer = foundry.AddDeployment("tts-server", "Higgs-Audio-v2.5", "2", "BosonAI");
+    chatServer = foundry.AddDeployment("chat-server", "gpt-4o-mini", "2024-07-18", "OpenAI");
+    embedServer = foundry.AddDeployment("embedding-server", "text-embedding-3-small", "1", "OpenAI");
+    grpcServer = grpcServer.WithReference(ttsServer);
+}
+else
+{
+    (ttsServer, chatServer, embedServer) = builder.AddVllmComposite(
+        otelCollector.GetEndpoint(OpenTelemetryCollectorResource.OtlpGrpcEndpointName));
+    grpcServer = grpcServer.WithReference(ttsServer).WaitFor(ttsServer);
+}
+
+grpcServer = grpcServer
+    .WithReference(chatServer)
+    .WithReference(embedServer);
 
 var postgresDb = builder.AddDatabase("theplot-db");
 var schemaMigrations = builder.WithSchemaMigrations<Projects.ThePlot_SchemaMigrations>(postgresDb, "theplot-schema-migrations");
@@ -43,10 +79,7 @@ serviceBus.AddServiceBusQueue("pdf-processing-priority");
 serviceBus.AddServiceBusQueue("pdf-processing-standard");
 serviceBus.AddServiceBusQueue("screenplay-import-status");
 
-var grpcServer = builder.AddProject<Projects.ThePlot_Grpc_Server>("grpc-service")
-    .WithHttpEndpoint(name: "grpc")
-    .WithEndpoint("grpc", e => e.Transport = "http2")
-    .WithOtlpCollectorReference(otelCollector)
+grpcServer
     .WithReference(postgresDb)
     .WithReference(pdfBlobs, "pdf-storage")
     .WithRoleAssignments(pdfBlobStorage, StorageBuiltInRole.StorageBlobDataContributor, StorageBuiltInRole.StorageBlobDelegator)
@@ -84,6 +117,21 @@ builder.AddProject<Projects.ThePlot_Workers_PdfProcessing>("pdf-processing-worke
     .WithReference(postgresDb)
     .WithOtlpCollectorReference(otelCollector)
     .WaitFor(serviceBus)
+    .WaitFor(grpcServer);
+
+builder.AddProject<Projects.ThePlot_Workers_ContentGeneration>("content-generation-worker")
+    .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
+    .WithReplicas(2)
+    .WithReference(postgresDb)
+    .WithReference(ttsServer)
+    .WithReference(chatServer)
+    .WithReference(embedServer)
+    .WithOtlpCollectorReference(otelCollector)
+    .WaitFor(postgresDb)
+    .WaitFor(schemaMigrations)
+    .WaitFor(ttsServer)
+    .WaitFor(chatServer)
+    .WaitFor(embedServer)
     .WaitFor(grpcServer);
 
 var envoyProxy = builder.AddEnvoyProxy("envoy-proxy")

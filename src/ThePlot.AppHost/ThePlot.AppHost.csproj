@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.2.0">
+<Project Sdk="Aspire.AppHost.Sdk/13.2.1">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,18 +15,20 @@
     <ProjectReference Include="..\ThePlot.Workers.PdfProcessing\ThePlot.Workers.PdfProcessing.csproj" />
     <ProjectReference Include="..\ThePlot.Workers.PdfSplitting\ThePlot.Workers.PdfSplitting.csproj" />
     <ProjectReference Include="..\ThePlot.Workers.PdfValidation\ThePlot.Workers.PdfValidation.csproj" />
+    <ProjectReference Include="..\ThePlot.Workers.ContentGeneration\ThePlot.Workers.ContentGeneration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.Azure.Functions" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="13.2.0" />
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.Azure.Functions" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.Azure.ServiceBus" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.Foundry" Version="13.2.1-preview.1.26180.6" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
-    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.Azure.PostgreSQL" Version="13.2.0" />
-    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.2.0" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.Redis" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.Azure.PostgreSQL" Version="13.2.1" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.2.1" />
     <PackageReference Include="Azure.Provisioning.EventGrid" Version="1.1.0" />
   </ItemGroup>
 </Project>

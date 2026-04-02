@@ -1,4 +1,6 @@
 using System.Text.Json;
+using ThePlot.Core.ContentGeneration;
+using ThePlot.Core.Voices;
 using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Core.Screenplays;
@@ -18,6 +20,8 @@ public sealed class Screenplay : IDateStamped
     public DateTime? DateDeleted { get; set; }
 
     public IReadOnlyList<Scenes.Scene>? Scenes { get; private init; }
+    public ICollection<Voice>? Voices { get; private init; }
+    public ICollection<GenerationRun>? GenerationRuns { get; private init; }
 
     public static Screenplay Create(string title, string[]? authors = null, JsonDocument? pdfMetadata = null)
     {
