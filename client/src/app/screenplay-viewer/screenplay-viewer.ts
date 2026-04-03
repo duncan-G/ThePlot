@@ -127,6 +127,22 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       { label: s.location || s.heading || `Scene ${i + 1}`, index: i, locationType: s.locationType },
     ]));
 
+    const elementOrder = new Map<string, number>();
+    let docOrd = 0;
+    for (const s of sceneList) {
+      for (const el of s.elements) {
+        elementOrder.set(el.id, docOrd++);
+      }
+    }
+    const nodeDocOrder = (node: NodeDetailInfo): number => {
+      let min = Number.MAX_SAFE_INTEGER;
+      for (const id of node.elementIds) {
+        const o = elementOrder.get(id);
+        if (o !== undefined && o < min) min = o;
+      }
+      return min === Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : min;
+    };
+
     const nodes = details.nodes.filter(n => n.kind !== 'PreGenerationAnalysis');
     const filtered = filter === 'all' ? nodes : nodes.filter(n => {
       if (filter === 'succeeded') return n.status === 'Succeeded';
@@ -148,6 +164,9 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
         });
       }
       groups.get(sid)!.nodes.push(node);
+    }
+    for (const g of groups.values()) {
+      g.nodes.sort((a, b) => nodeDocOrder(a) - nodeDocOrder(b));
     }
     return [...groups.values()].sort((a, b) => a.sceneIndex - b.sceneIndex);
   });
@@ -184,6 +203,37 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       }
     }
     return map;
+  });
+
+  /** Nodes for progress UI: scene order, then document order within scene. */
+  protected readonly orderedProgressNodes = computed((): NodeStatusInfo[] => {
+    const sceneList = this.scenes();
+    const sceneOrder = new Map(sceneList.map((s, i) => [s.id, i]));
+    const elementOrder = new Map<string, number>();
+    let docOrd = 0;
+    for (const s of sceneList) {
+      for (const el of s.elements) {
+        elementOrder.set(el.id, docOrd++);
+      }
+    }
+    const list = [...this.nodeStatuses().values()].filter(n => n.kind !== 'PreGenerationAnalysis');
+    const key = (n: NodeStatusInfo) => {
+      const si = n.sceneId ? (sceneOrder.get(n.sceneId) ?? 9999) : 9999;
+      let eo = Number.MAX_SAFE_INTEGER;
+      for (const id of n.elementIds) {
+        const o = elementOrder.get(id);
+        if (o !== undefined && o < eo) eo = o;
+      }
+      if (eo === Number.MAX_SAFE_INTEGER) eo = 999999999;
+      return { si, eo };
+    };
+    list.sort((a, b) => {
+      const ka = key(a);
+      const kb = key(b);
+      if (ka.si !== kb.si) return ka.si - kb.si;
+      return ka.eo - kb.eo;
+    });
+    return list;
   });
 
   protected readonly generationProgress = computed(() => {

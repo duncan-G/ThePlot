@@ -1110,7 +1110,7 @@
 
       <!-- Node list -->
       <div class="vertical-scroll max-h-[50vh] overflow-y-auto px-5 py-3">
-        @for (entry of nodeStatuses().values(); track entry.nodeId) {
+        @for (entry of orderedProgressNodes(); track entry.nodeId) {
           @if (entry.kind !== 'PreGenerationAnalysis') {
             <div class="flex items-start gap-3 py-2">
               <!-- Status indicator -->
