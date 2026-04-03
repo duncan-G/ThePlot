@@ -362,6 +362,9 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       await this.contentGenService.completeVoiceDetermination(runId);
       this.generationStatus.set('running');
       this.subscribeToGeneration(runId);
+      if (this.activeTab() === 'generation') {
+        void this.loadGenerationRuns();
+      }
     } catch (err) {
       this.generationError.set(err instanceof Error ? err.message : 'Failed to start generation');
       this.generationStatus.set('failed');
@@ -379,6 +382,9 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       await this.contentGenService.replayRun(runId);
       this.generationStatus.set('running');
       this.subscribeToGeneration(runId);
+      if (this.activeTab() === 'generation') {
+        void this.loadGenerationRuns();
+      }
     } catch (err) {
       this.generationError.set(err instanceof Error ? err.message : 'Failed to continue generation');
       this.generationStatus.set('failed');
@@ -670,12 +676,62 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       return next;
     });
 
+    this.syncGenerationRunRowFromStream(evt);
+    this.mergeSelectedRunDetailsFromStream(evt);
+
     if (evt.runStatus === 'Completed') {
       this.generationStatus.set('completed');
     } else if (evt.runStatus === 'Failed') {
       this.generationError.set(evt.errorMessage || 'Generation failed');
       this.generationStatus.set('failed');
     }
+  }
+
+  /** Keep Generation tab run list in sync with live `nodeStatuses` (same source as the sidebar count). */
+  private syncGenerationRunRowFromStream(evt: RunStatusUpdateEvent): void {
+    const runId = evt.runId;
+    const p = this.generationProgress();
+    this.generationRuns.update(list => {
+      const idx = list.findIndex(r => r.runId === runId);
+      if (idx < 0) return list;
+      const cur = list[idx];
+      const next = [...list];
+      next[idx] = {
+        ...cur,
+        status: evt.runStatus || cur.status,
+        phase: evt.phase || cur.phase,
+        totalNodes: p.total,
+        succeededNodes: p.succeeded,
+        failedNodes: p.failed,
+      };
+      return next;
+    });
+  }
+
+  /** When a run is expanded, merge streaming node updates into details so filters and rows stay current. */
+  private mergeSelectedRunDetailsFromStream(evt: RunStatusUpdateEvent): void {
+    this.selectedRunDetails.update(details => {
+      if (!details || details.runId !== evt.runId) return details;
+      const byId = new Map(details.nodes.map(n => [n.nodeId, n]));
+      for (const u of evt.nodes) {
+        const cur = byId.get(u.nodeId);
+        if (cur) {
+          byId.set(u.nodeId, {
+            ...cur,
+            status: u.status,
+            retryCount: u.retryCount,
+            lastError: u.lastError,
+          });
+        }
+      }
+      return {
+        ...details,
+        phase: evt.phase || details.phase,
+        status: evt.runStatus || details.status,
+        errorMessage: evt.errorMessage ?? details.errorMessage,
+        nodes: details.nodes.map(n => byId.get(n.nodeId) ?? n),
+      };
+    });
   }
 
   private nodeStatusToElementStatus(status: string): ElementGenStatus {

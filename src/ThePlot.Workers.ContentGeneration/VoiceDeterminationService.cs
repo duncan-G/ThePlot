@@ -2,27 +2,31 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Pgvector;
-using Pgvector.EntityFrameworkCore;
+using ThePlot.Core.Characters;
 using ThePlot.Core.SceneElements;
+using ThePlot.Core.Scenes;
 using ThePlot.Core.Voices;
-using ThePlot.Infrastructure;
-using ThePlot.Infrastructure.ContentGeneration;
+using ThePlot.Database.Abstractions;
 using ThePlot.Infrastructure.Embeddings;
 
 namespace ThePlot.Workers.ContentGeneration;
 
 public sealed class VoiceDeterminationService(
-    ThePlotContext db,
+    IUnitOfWorkFactory unitOfWorkFactory,
+    IVoiceRepository voiceRepository,
+    ICharacterRepository characterRepository,
+    IQueryFactory<Scene, ISceneQuery> sceneQueryFactory,
+    IQueryFactory<SceneElement, ISceneElementQuery> sceneElementQueryFactory,
+    IQueryFactory<Character, ICharacterQuery> characterQueryFactory,
+    IQueryFactory<Voice, IVoiceQuery> voiceQueryFactory,
     IChatClient chatClient,
     IEmbeddingClient embeddingClient,
-    IOptions<ContentGenerationOptions> options,
     ILogger<VoiceDeterminationService> logger)
 {
     public async Task EnsureVoicesForScreenplayAsync(Guid screenplayId, CancellationToken ct)
     {
-        var threshold = options.Value.VoiceSimilarityThreshold;
+        using var uow = unitOfWorkFactory.CreateReadWrite("VoiceDetermination");
 
         var context = await BuildScreenplayContextAsync(screenplayId, ct);
         if (string.IsNullOrWhiteSpace(context.Summary))
@@ -31,49 +35,57 @@ public sealed class VoiceDeterminationService(
             return;
         }
 
-        var hasNarrator = await db.Voices
-            .AnyAsync(v => v.ScreenplayId == screenplayId && v.Role == VoiceRole.Narrator, ct);
+        var narratorQuery = voiceQueryFactory.Create().ByScreenplayId(screenplayId).ByRole(VoiceRole.Narrator);
+        var hasNarrator = await voiceRepository.ExistsByQueryAsync(narratorQuery, ct);
 
         if (!hasNarrator)
         {
-            await ResolveNarratorAsync(screenplayId, context.Summary, threshold, ct);
+            await ResolveNarratorAsync(screenplayId, context.Summary, ct);
         }
 
         foreach (var (characterId, characterName, dialogue) in context.Characters)
         {
-            var character = await db.Characters.FirstOrDefaultAsync(c => c.Id == characterId, ct);
+            var character = await characterRepository.GetByKeyAsync(characterId, ct);
             if (character is null || character.VoiceId != null)
             {
                 continue;
             }
 
             var voice = await ResolveCharacterVoiceAsync(
-                screenplayId, characterId, characterName, dialogue, context.Summary, threshold, ct);
+                screenplayId, characterId, characterName, dialogue, context.Summary, ct);
 
             character.AssignVoice(voice.Id);
         }
 
-        await db.SaveChangesAsync(ct);
+        await uow.CommitAsync(ct);
     }
 
-    public async Task<Guid> GetNarratorVoiceIdAsync(Guid screenplayId, CancellationToken ct) =>
-        await db.Voices.AsNoTracking()
-            .Where(v => v.ScreenplayId == screenplayId && v.Role == VoiceRole.Narrator)
+    public async Task<Guid> GetNarratorVoiceIdAsync(Guid screenplayId, CancellationToken ct)
+    {
+        var q = voiceQueryFactory.Create().ByScreenplayId(screenplayId).ByRole(VoiceRole.Narrator);
+        return await q.AsQueryable().Select(v => v.Id).FirstAsync(ct);
+    }
+
+    public async Task<Dictionary<Guid, Guid>> GetCharacterVoiceMapAsync(Guid screenplayId, CancellationToken ct)
+    {
+        var voiceIds = await voiceQueryFactory.Create()
+            .ByScreenplayId(screenplayId)
+            .AsQueryable()
             .Select(v => v.Id)
-            .FirstAsync(ct);
+            .ToListAsync(ct);
 
-    public async Task<Dictionary<Guid, Guid>> GetCharacterVoiceMapAsync(Guid screenplayId, CancellationToken ct) =>
-        await db.Characters.AsNoTracking()
-            .Where(c => c.VoiceId != null)
-            .Join(
-                db.Voices.AsNoTracking().Where(v => v.ScreenplayId == screenplayId),
-                c => c.VoiceId,
-                v => v.Id,
-                (c, v) => new { c.Id, VoiceId = v.Id })
-            .ToDictionaryAsync(x => x.Id, x => x.VoiceId, ct);
+        if (voiceIds.Count == 0)
+        {
+            return new Dictionary<Guid, Guid>();
+        }
 
-    private async Task ResolveNarratorAsync(
-        Guid screenplayId, string screenplaySummary, double threshold, CancellationToken ct)
+        return await characterQueryFactory.Create()
+            .ByVoiceIds(voiceIds)
+            .AsQueryable()
+            .ToDictionaryAsync(c => c.Id, c => c.VoiceId!.Value, ct);
+    }
+
+    private async Task ResolveNarratorAsync(Guid screenplayId, string screenplaySummary, CancellationToken ct)
     {
         var description = await GenerateVoiceDescriptionAsync(
             $"""
@@ -90,20 +102,9 @@ public sealed class VoiceDeterminationService(
         var embedding = await embeddingClient.GetEmbeddingAsync(description, ct: ct);
         var vector = new Vector(embedding);
 
-        var match = await FindClosestVoiceAsync(VoiceRole.Narrator, vector, threshold, ct);
-        if (match is not null)
-        {
-            logger.LogInformation("Reusing existing narrator voice {VoiceId} for screenplay {ScreenplayId}.",
-                match.Id, screenplayId);
-            var narrator = Voice.CreateNarrator(screenplayId, match.Description);
-            narrator.SetEmbedding(match.Embedding);
-            db.Voices.Add(narrator);
-            return;
-        }
-
-        var narrator2 = Voice.CreateNarrator(screenplayId, description);
-        narrator2.SetEmbedding(vector);
-        db.Voices.Add(narrator2);
+        var narrator = Voice.CreateNarrator(screenplayId, description);
+        narrator.SetEmbedding(vector);
+        await voiceRepository.AddAsync(narrator, ct);
     }
 
     private async Task<Voice> ResolveCharacterVoiceAsync(
@@ -112,7 +113,6 @@ public sealed class VoiceDeterminationService(
         string characterName,
         string dialogue,
         string screenplaySummary,
-        double threshold,
         CancellationToken ct)
     {
         var description = await GenerateVoiceDescriptionAsync(
@@ -133,42 +133,10 @@ public sealed class VoiceDeterminationService(
         var embedding = await embeddingClient.GetEmbeddingAsync(description, ct: ct);
         var vector = new Vector(embedding);
 
-        var match = await FindClosestVoiceAsync(VoiceRole.Character, vector, threshold, ct);
-        if (match is not null)
-        {
-            logger.LogInformation(
-                "Reusing existing voice {VoiceId} ('{VoiceName}') for character {CharacterName} in screenplay {ScreenplayId}.",
-                match.Id, match.Name, characterName, screenplayId);
-            var voice = Voice.CreateForCharacter(screenplayId, characterId, characterName, match.Description);
-            voice.SetEmbedding(match.Embedding);
-            db.Voices.Add(voice);
-            return voice;
-        }
-
-        var newVoice = Voice.CreateForCharacter(screenplayId, characterId, characterName, description);
-        newVoice.SetEmbedding(vector);
-        db.Voices.Add(newVoice);
-        return newVoice;
-    }
-
-    private async Task<Voice?> FindClosestVoiceAsync(
-        VoiceRole role, Vector queryVector, double threshold, CancellationToken ct)
-    {
-        // pgvector cosine distance operator <=> returns values in [0, 2]; lower = more similar.
-        // We filter for voices that have an embedding and pick the nearest one.
-        var closest = await db.Voices
-            .AsNoTracking()
-            .Where(v => v.Role == role && v.Embedding != null)
-            .OrderBy(v => v.Embedding!.CosineDistance(queryVector))
-            .Select(v => new { Voice = v, Distance = v.Embedding!.CosineDistance(queryVector) })
-            .FirstOrDefaultAsync(ct);
-
-        if (closest is null || closest.Distance > threshold)
-        {
-            return null;
-        }
-
-        return closest.Voice;
+        var voice = Voice.CreateForCharacter(screenplayId, characterId, characterName, description);
+        voice.SetEmbedding(vector);
+        await voiceRepository.AddAsync(voice, ct);
+        return voice;
     }
 
     private async Task<string> GenerateVoiceDescriptionAsync(string prompt, CancellationToken ct)
@@ -179,20 +147,31 @@ public sealed class VoiceDeterminationService(
 
     private async Task<ScreenplayContext> BuildScreenplayContextAsync(Guid screenplayId, CancellationToken ct)
     {
-        var scenes = await db.Scenes.AsNoTracking()
-            .Where(s => s.ScreenplayId == screenplayId)
+        var scenes = await sceneQueryFactory.Create()
+            .ByScreenplayId(screenplayId)
+            .AsQueryable()
             .OrderBy(s => s.DateCreated)
             .Select(s => s.Id)
             .ToListAsync(ct);
 
-        var elements = await db.SceneElements.AsNoTracking()
-            .Where(e => scenes.Contains(e.SceneId))
+        var elements = await sceneElementQueryFactory.Create()
+            .BySceneIds(scenes)
+            .AsQueryable()
             .OrderBy(e => e.SequenceOrder)
             .ToListAsync(ct);
 
-        var characters = await db.Characters.AsNoTracking()
-            .Where(c => elements.Select(e => e.CharacterId).Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
+        var characterIds = elements
+            .Where(e => e.CharacterId.HasValue)
+            .Select(e => e.CharacterId!.Value)
+            .Distinct()
+            .ToList();
+
+        var characters = characterIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await characterQueryFactory.Create()
+                .ByIds(characterIds)
+                .AsQueryable()
+                .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
 
         var summarySb = new StringBuilder(4096);
         var characterDialogue = new Dictionary<Guid, StringBuilder>();

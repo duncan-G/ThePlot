@@ -13,12 +13,6 @@ public sealed class ContentGenerationOptions
     public TimeSpan RetryBackoffBase { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Maximum pgvector cosine distance (0 = identical, 2 = opposite) below which an
-    /// existing voice is considered a match and reused instead of generating a new one.
-    /// </summary>
-    public double VoiceSimilarityThreshold { get; set; } = 0.15;
-
-    /// <summary>
     /// Number of TTS nodes to claim and dispatch concurrently per worker cycle,
     /// allowing vLLM to batch requests rather than process them one at a time.
     /// </summary>
