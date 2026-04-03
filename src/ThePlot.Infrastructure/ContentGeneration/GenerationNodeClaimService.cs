@@ -8,11 +8,9 @@ using ThePlot.Core.ContentGeneration;
 
 namespace ThePlot.Infrastructure.ContentGeneration;
 
-public sealed record ClaimedGenerationWork(Guid NodeId, Guid AttemptId);
-
-public sealed class GenerationNodeClaimService(
+internal sealed class GenerationNodeClaimService(
     ThePlotContext db,
-    IOptions<ContentGenerationOptions> options)
+    IOptions<ContentGenerationOptions> options) : IGenerationNodeClaimService
 {
     public async Task<ClaimedGenerationWork?> TryClaimNextAsync(string workerId, CancellationToken ct)
     {

@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Pgvector;
@@ -16,6 +15,8 @@ public sealed class VoiceDeterminationService(
     IUnitOfWorkFactory unitOfWorkFactory,
     IVoiceRepository voiceRepository,
     ICharacterRepository characterRepository,
+    ISceneRepository sceneRepository,
+    ISceneElementRepository sceneElementRepository,
     IQueryFactory<Scene, ISceneQuery> sceneQueryFactory,
     IQueryFactory<SceneElement, ISceneElementQuery> sceneElementQueryFactory,
     IQueryFactory<Character, ICharacterQuery> characterQueryFactory,
@@ -62,27 +63,31 @@ public sealed class VoiceDeterminationService(
 
     public async Task<Guid> GetNarratorVoiceIdAsync(Guid screenplayId, CancellationToken ct)
     {
-        var q = voiceQueryFactory.Create().ByScreenplayId(screenplayId).ByRole(VoiceRole.Narrator);
-        return await q.AsQueryable().Select(v => v.Id).FirstAsync(ct);
+        var query = voiceQueryFactory.Create().ByScreenplayId(screenplayId).ByRole(VoiceRole.Narrator);
+        var voice = await voiceRepository.GetFirstByQueryAsync(query, ct)
+                    ?? throw new InvalidOperationException(
+                        $"No narrator voice found for screenplay {screenplayId}.");
+        return voice.Id;
     }
 
     public async Task<Dictionary<Guid, Guid>> GetCharacterVoiceMapAsync(Guid screenplayId, CancellationToken ct)
     {
-        var voiceIds = await voiceQueryFactory.Create()
-            .ByScreenplayId(screenplayId)
-            .AsQueryable()
-            .Select(v => v.Id)
-            .ToListAsync(ct);
+        var voiceIds = await voiceRepository.GetByQueryAsync(
+            voiceQueryFactory.Create().ByScreenplayId(screenplayId),
+            v => v.Id,
+            ct);
 
         if (voiceIds.Count == 0)
         {
             return new Dictionary<Guid, Guid>();
         }
 
-        return await characterQueryFactory.Create()
-            .ByVoiceIds(voiceIds)
-            .AsQueryable()
-            .ToDictionaryAsync(c => c.Id, c => c.VoiceId!.Value, ct);
+        var characters = await characterRepository.GetByQueryAsync(
+            characterQueryFactory.Create().ByVoiceIds(voiceIds), ct);
+
+        return characters
+            .Where(c => c.VoiceId.HasValue)
+            .ToDictionary(c => c.Id, c => c.VoiceId!.Value);
     }
 
     private async Task ResolveNarratorAsync(Guid screenplayId, string screenplaySummary, CancellationToken ct)
@@ -147,18 +152,15 @@ public sealed class VoiceDeterminationService(
 
     private async Task<ScreenplayContext> BuildScreenplayContextAsync(Guid screenplayId, CancellationToken ct)
     {
-        var scenes = await sceneQueryFactory.Create()
+        var sceneQuery = sceneQueryFactory.Create()
             .ByScreenplayId(screenplayId)
-            .AsQueryable()
-            .OrderBy(s => s.DateCreated)
-            .Select(s => s.Id)
-            .ToListAsync(ct);
+            .OrderByDateCreated();
+        var sceneIds = await sceneRepository.GetByQueryAsync(sceneQuery, s => s.Id, ct);
 
-        var elements = await sceneElementQueryFactory.Create()
-            .BySceneIds(scenes)
-            .AsQueryable()
-            .OrderBy(e => e.SequenceOrder)
-            .ToListAsync(ct);
+        var elementQuery = sceneElementQueryFactory.Create()
+            .BySceneIds(sceneIds)
+            .OrderBySequenceOrder();
+        var elements = await sceneElementRepository.GetByQueryAsync(elementQuery, ct);
 
         var characterIds = elements
             .Where(e => e.CharacterId.HasValue)
@@ -168,10 +170,9 @@ public sealed class VoiceDeterminationService(
 
         var characters = characterIds.Count == 0
             ? new Dictionary<Guid, string>()
-            : await characterQueryFactory.Create()
-                .ByIds(characterIds)
-                .AsQueryable()
-                .ToDictionaryAsync(c => c.Id, c => c.Name, ct);
+            : (await characterRepository.GetByQueryAsync(
+                    characterQueryFactory.Create().ByIds(characterIds), ct))
+                .ToDictionary(c => c.Id, c => c.Name);
 
         var summarySb = new StringBuilder(4096);
         var characterDialogue = new Dictionary<Guid, StringBuilder>();

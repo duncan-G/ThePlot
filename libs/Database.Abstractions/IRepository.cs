@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+
 namespace ThePlot.Database.Abstractions;
 
 public interface IRepository<TEntity, TKey> where TEntity : class
@@ -8,7 +10,18 @@ public interface IRepository<TEntity, TKey> where TEntity : class
 
     Task<TEntity?> GetByKeyAsync(TKey key, CancellationToken cancellationToken = default);
 
+    Task<TEntity?> GetFirstByQueryAsync(IQuery<TEntity> query,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<TEntity>> GetByQueryAsync(IQuery<TEntity> query,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TResult>> GetByQueryAsync<TResult>(IQuery<TEntity> query,
+        Expression<Func<TEntity, TResult>> selector,
+        CancellationToken cancellationToken = default);
+
+    Task<TResult?> GetFirstByQueryAsync<TResult>(IQuery<TEntity> query,
+        Expression<Func<TEntity, TResult>> selector,
         CancellationToken cancellationToken = default);
 
     Task<PageResponse<TEntity>> GetByQueryPagedAsync<TSort>(
@@ -24,6 +37,8 @@ public interface IRepository<TEntity, TKey> where TEntity : class
         IQuery<TEntity> query,
         Action<Microsoft.EntityFrameworkCore.Query.UpdateSettersBuilder<TEntity>> setPropertyCalls,
         CancellationToken cancellationToken = default);
+
+    Task<int> DeleteByQueryAsync(IQuery<TEntity> query, CancellationToken cancellationToken = default);
 
     Task RemoveAsync(TEntity entity, CancellationToken cancellationToken = default);
 }

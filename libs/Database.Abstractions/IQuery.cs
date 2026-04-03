@@ -1,6 +1,3 @@
 namespace ThePlot.Database.Abstractions;
 
-public interface IQuery<out T>
-{
-    IQueryable<T> AsQueryable();
-}
+public interface IQuery<out T>;

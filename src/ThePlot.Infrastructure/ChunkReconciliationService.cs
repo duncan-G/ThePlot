@@ -1,24 +1,25 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ThePlot.Core.SceneElements;
 using ThePlot.Core.Scenes;
+using ThePlot.Core.ScreenplayImports;
 using ThePlot.Database.Abstractions;
-using ThePlot.Infrastructure;
 
-namespace ThePlot.Grpc.Server.Services;
+namespace ThePlot.Infrastructure;
 
 /// <summary>
 /// Runs after all chunks are processed. Merges continuation scenes into predecessors,
 /// then deduplicates characters and locations that were created independently per chunk.
 /// </summary>
-public sealed class ChunkReconciliationService(
+internal sealed class ChunkReconciliationService(
     ISceneRepository sceneRepository,
     ISceneElementRepository sceneElementRepository,
     IQueryFactory<Scene, ISceneQuery> sceneQueryFactory,
-    IQueryFactory<SceneElement, ISceneElementQuery> elementQueryFactory,
+    IQueryFactory<SceneElement, ISceneElementQuery> sceneElementQueryFactory,
     IUnitOfWorkFactory unitOfWorkFactory,
     ThePlotContext db,
-    ILogger<ChunkReconciliationService> logger)
+    ILogger<ChunkReconciliationService> logger) : IChunkReconciliationService
 {
     public async Task ReconcileAsync(Guid screenplayId, CancellationToken ct)
     {
@@ -62,7 +63,7 @@ public sealed class ChunkReconciliationService(
             var continuation = ordered[i];
 
             var predecessorElements = await sceneElementRepository.GetByQueryAsync(
-                elementQueryFactory.Create().BySceneIds([predecessor.Id]), ct);
+                sceneElementQueryFactory.Create().BySceneIds([predecessor.Id]), ct);
             var maxOrder = predecessorElements.Count > 0
                 ? predecessorElements.Max(e => e.SequenceOrder)
                 : -1;
@@ -70,7 +71,7 @@ public sealed class ChunkReconciliationService(
             var offset = maxOrder + 1;
 
             var reparented = await sceneElementRepository.UpdateByQueryAsync(
-                elementQueryFactory.Create().BySceneIds([continuation.Id]),
+                sceneElementQueryFactory.Create().BySceneIds([continuation.Id]),
                 set => set
                     .SetProperty(e => e.SceneId, predecessor.Id)
                     .SetProperty(e => e.SequenceOrder, e => e.SequenceOrder + offset),
@@ -94,10 +95,6 @@ public sealed class ChunkReconciliationService(
         }
     }
 
-    /// <summary>
-    /// Each chunk creates its own Character rows. After all chunks are processed,
-    /// group by name, pick one winner, remap all element FKs, delete the losers.
-    /// </summary>
     private async Task DeduplicateCharactersAsync(Guid screenplayId, CancellationToken ct)
     {
         using var uow = unitOfWorkFactory.CreateReadWrite("DeduplicateCharacters");
@@ -153,10 +150,6 @@ public sealed class ChunkReconciliationService(
             screenplayId, groups.Count, remapped);
     }
 
-    /// <summary>
-    /// Each chunk creates its own Location rows. After all chunks are processed,
-    /// group by description, pick one winner, remap all scene FKs, delete the losers.
-    /// </summary>
     private async Task DeduplicateLocationsAsync(Guid screenplayId, CancellationToken ct)
     {
         using var uow = unitOfWorkFactory.CreateReadWrite("DeduplicateLocations");

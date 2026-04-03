@@ -33,11 +33,15 @@ import {
   PlaybackQueueItem,
 } from '../../lib/services/audio-playback.service';
 import { ThemeService } from '../../lib/services/theme.service';
+import { context, trace, Span, Context, SpanStatusCode } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('theplot-client');
 
 type ViewState = 'importing' | 'viewing' | 'error';
 type GenerationState = 'idle' | 'starting' | 'running' | 'completed' | 'failed';
 type ActiveTab = 'screenplay' | 'characters' | 'generation';
 type NodeFilter = 'all' | 'succeeded' | 'failed' | 'pending';
+type NodeKindFilter = 'all' | 'VoicePromptBatch' | 'ActionElement' | 'VoiceOverElement';
 
 interface SceneNodeGroup {
   sceneId: string;
@@ -103,12 +107,16 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
   protected readonly selectedRunDetails = signal<RunDetailsInfo | null>(null);
   protected readonly selectedRunDetailsLoading = signal(false);
   protected readonly nodeStatusFilter = signal<NodeFilter>('all');
+  protected readonly nodeKindFilter = signal<NodeKindFilter>('all');
   protected readonly collapsedScenes = signal<Set<string>>(new Set());
 
   protected readonly nodeFilterCounts = computed(() => {
     const details = this.selectedRunDetails();
     if (!details) return { all: 0, succeeded: 0, failed: 0, pending: 0 };
-    const nodes = details.nodes.filter(n => n.kind !== 'PreGenerationAnalysis');
+    const kindF = this.nodeKindFilter();
+    const nodes = details.nodes.filter(
+      n => n.kind !== 'PreGenerationAnalysis' && this.nodeMatchesKindFilter(n, kindF),
+    );
     return {
       all: nodes.length,
       succeeded: nodes.filter(n => n.status === 'Succeeded').length,
@@ -117,10 +125,28 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
     };
   });
 
+  protected readonly nodeKindFilterCounts = computed(() => {
+    const details = this.selectedRunDetails();
+    if (!details) {
+      return { all: 0, VoicePromptBatch: 0, ActionElement: 0, VoiceOverElement: 0 };
+    }
+    const statusF = this.nodeStatusFilter();
+    const nodes = details.nodes.filter(
+      n => n.kind !== 'PreGenerationAnalysis' && this.nodeMatchesStatusFilter(n, statusF),
+    );
+    return {
+      all: nodes.length,
+      VoicePromptBatch: nodes.filter(n => n.kind === 'VoicePromptBatch').length,
+      ActionElement: nodes.filter(n => n.kind === 'ActionElement').length,
+      VoiceOverElement: nodes.filter(n => n.kind === 'VoiceOverElement').length,
+    };
+  });
+
   protected readonly groupedNodes = computed((): SceneNodeGroup[] => {
     const details = this.selectedRunDetails();
     if (!details) return [];
-    const filter = this.nodeStatusFilter();
+    const statusF = this.nodeStatusFilter();
+    const kindF = this.nodeKindFilter();
     const sceneList = this.scenes();
     const sceneMap = new Map(sceneList.map((s, i) => [
       s.id,
@@ -143,16 +169,13 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
       return min === Number.MAX_SAFE_INTEGER ? Number.MAX_SAFE_INTEGER : min;
     };
 
-    const nodes = details.nodes.filter(n => n.kind !== 'PreGenerationAnalysis');
-    const filtered = filter === 'all' ? nodes : nodes.filter(n => {
-      if (filter === 'succeeded') return n.status === 'Succeeded';
-      if (filter === 'failed') return n.status === 'Failed' || n.status === 'Blocked';
-      if (filter === 'pending') return ['Pending', 'Ready', 'NeedsRetry', 'Running'].includes(n.status);
-      return true;
-    });
+    const nodes = details.nodes
+      .filter(n => n.kind !== 'PreGenerationAnalysis')
+      .filter(n => this.nodeMatchesKindFilter(n, kindF))
+      .filter(n => this.nodeMatchesStatusFilter(n, statusF));
 
     const groups = new Map<string, SceneNodeGroup>();
-    for (const node of filtered) {
+    for (const node of nodes) {
       const sid = node.sceneId || '__no_scene__';
       if (!groups.has(sid)) {
         const scene = sceneMap.get(sid);
@@ -304,6 +327,8 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
 
   private statusSub: Subscription | null = null;
   private generationSub: Subscription | null = null;
+  private importSpan: Span | null = null;
+  private importCtx: Context | null = null;
 
   ngOnInit(): void {
     this.themeService.init();
@@ -324,6 +349,7 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.statusSub?.unsubscribe();
+    this.endImportSpan();
     this.generationSub?.unsubscribe();
     this.audioPlayback.dispose();
   }
@@ -344,6 +370,7 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
 
   protected goHome(): void {
     this.statusSub?.unsubscribe();
+    this.endImportSpan();
     this.generationSub?.unsubscribe();
     this.router.navigate(['/']);
   }
@@ -521,6 +548,7 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
     }
     this.selectedRunDetails.set(null);
     this.nodeStatusFilter.set('all');
+    this.nodeKindFilter.set('all');
     this.collapsedScenes.set(new Set());
     this.selectedRunDetailsLoading.set(true);
     try {
@@ -573,8 +601,32 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
     { value: 'pending', label: 'Pending' },
   ];
 
+  protected readonly nodeKindFilterOptions: { value: NodeKindFilter; label: string }[] = [
+    { value: 'all', label: 'All types' },
+    { value: 'VoicePromptBatch', label: 'Dialogue batch' },
+    { value: 'ActionElement', label: 'Action' },
+    { value: 'VoiceOverElement', label: 'Voice over' },
+  ];
+
   protected setNodeFilter(filter: NodeFilter): void {
     this.nodeStatusFilter.set(filter);
+  }
+
+  protected setNodeKindFilter(filter: NodeKindFilter): void {
+    this.nodeKindFilter.set(filter);
+  }
+
+  private nodeMatchesStatusFilter(n: NodeDetailInfo, filter: NodeFilter): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'succeeded') return n.status === 'Succeeded';
+    if (filter === 'failed') return n.status === 'Failed' || n.status === 'Blocked';
+    if (filter === 'pending') return ['Pending', 'Ready', 'NeedsRetry', 'Running'].includes(n.status);
+    return true;
+  }
+
+  private nodeMatchesKindFilter(n: NodeDetailInfo, filter: NodeKindFilter): boolean {
+    if (filter === 'all') return true;
+    return n.kind === filter;
   }
 
   protected toggleSceneCollapse(sceneId: string): void {
@@ -748,19 +800,43 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
 
   private subscribeToStatus(blobName: string): void {
     this.statusSub?.unsubscribe();
-    this.statusSub = this.screenplayService.streamImportStatus(blobName).subscribe({
-      next: (evt: ImportEvent) => this.handleImportEvent(evt),
-      error: (err: Error) => {
-        this.error.set(`Connection lost: ${err.message}`);
-        if (!this.screenplay()) {
-          this.view.set('error');
-        }
-      },
-      complete: () => {
-        this.importPhase.set('Import complete');
-        this.checkAllChunksFailed();
-      },
+    this.endImportSpan();
+
+    const span = tracer.startSpan('screenplay-import-monitoring', {
+      attributes: { 'import.blob_name': blobName },
     });
+    this.importSpan = span;
+    this.importCtx = trace.setSpan(context.active(), span);
+
+    this.statusSub = context.with(this.importCtx, () =>
+      this.screenplayService.streamImportStatus(blobName).subscribe({
+        next: (evt: ImportEvent) => {
+          context.with(this.importCtx!, () => this.handleImportEvent(evt));
+        },
+        error: (err: Error) => {
+          this.endImportSpan(SpanStatusCode.ERROR, err.message);
+          this.error.set(`Connection lost: ${err.message}`);
+          if (!this.screenplay()) {
+            this.view.set('error');
+          }
+        },
+        complete: () => {
+          this.endImportSpan(SpanStatusCode.OK);
+          this.importPhase.set('Import complete');
+          this.checkAllChunksFailed();
+        },
+      }),
+    );
+  }
+
+  private endImportSpan(code?: SpanStatusCode, message?: string): void {
+    if (!this.importSpan) return;
+    if (code !== undefined) {
+      this.importSpan.setStatus({ code, message });
+    }
+    this.importSpan.end();
+    this.importSpan = null;
+    this.importCtx = null;
   }
 
   private async handleImportEvent(evt: ImportEvent): Promise<void> {
@@ -815,6 +891,7 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
     if (c.length > 0 && c.every(ch => ch.status === 'failed') && !this.screenplay() && this.view() === 'importing') {
       this.statusSub?.unsubscribe();
       this.statusSub = null;
+      this.endImportSpan(SpanStatusCode.ERROR, 'All chunks failed');
       this.chunks.set([]);
       this.screenplayId.set(null);
       this.totalPages.set(0);

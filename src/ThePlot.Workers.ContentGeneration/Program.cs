@@ -5,6 +5,7 @@ using ThePlot.Workers.ContentGeneration;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddAzureServiceBusClient("messaging");
 builder.AddAzureChatCompletionsClient("chat-server").AddChatClient();
 builder.AddDatabaseServices("theplot-db", options =>
 {

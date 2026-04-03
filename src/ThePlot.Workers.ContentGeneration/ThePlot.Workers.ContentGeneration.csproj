@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.2.1-preview.1.26180.6" />
+    <PackageReference Include="Aspire.Azure.Messaging.ServiceBus" Version="13.2.1" />
   </ItemGroup>
 
   <ItemGroup>

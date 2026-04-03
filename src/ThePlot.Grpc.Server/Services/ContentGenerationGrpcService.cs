@@ -1,17 +1,28 @@
 using System.Text.Json;
 using Grpc.Core;
-using Microsoft.EntityFrameworkCore;
+using ThePlot.Core.Characters;
 using ThePlot.Core.ContentGeneration;
 using ThePlot.Core.Voices;
-using ThePlot.Infrastructure;
+using ThePlot.Database.Abstractions;
 using ThePlot.Workers.ContentGeneration;
 
 namespace ThePlot.Grpc.Server.Services;
 
 public sealed class ContentGenerationGrpcService(
     ContentGenerationRunService runService,
+    ContentGenerationWorkPublisher workPublisher,
     IServiceScopeFactory scopeFactory,
-    ThePlotContext db)
+    IUnitOfWorkFactory unitOfWorkFactory,
+    IGenerationRunRepository runRepository,
+    IGenerationNodeRepository nodeRepository,
+    IGeneratedArtifactRepository artifactRepository,
+    IQueryFactory<GenerationRun, IGenerationRunQuery> runQueryFactory,
+    IQueryFactory<GenerationNode, IGenerationNodeQuery> nodeQueryFactory,
+    IQueryFactory<GeneratedArtifact, IGeneratedArtifactQuery> artifactQueryFactory,
+    IVoiceRepository voiceRepository,
+    ICharacterRepository characterRepository,
+    IQueryFactory<Voice, IVoiceQuery> voiceQueryFactory,
+    IQueryFactory<Character, ICharacterQuery> characterQueryFactory)
     : ContentGenerationService.ContentGenerationServiceBase
 {
     public override async Task<StartRunResponse> StartRun(StartRunRequest request, ServerCallContext context)
@@ -44,7 +55,8 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid run_id."));
         }
 
-        await runService.EnqueueVoiceDeterminationAsync(runId, context.CancellationToken);
+        var traceParent = await runService.EnqueueVoiceDeterminationAsync(runId, context.CancellationToken);
+        await workPublisher.PublishVoiceDeterminationAsync(runId, traceParent, context.CancellationToken);
         return new CompleteVoiceDeterminationResponse();
     }
 
@@ -56,6 +68,7 @@ public sealed class ContentGenerationGrpcService(
         }
 
         await runService.ReplayRunAsync(runId, context.CancellationToken);
+        await workPublisher.PublishTtsWorkAvailableAsync(runId, null, context.CancellationToken);
         return new ReplayRunResponse();
     }
 
@@ -69,6 +82,7 @@ public sealed class ContentGenerationGrpcService(
         }
 
         await runService.RegenerateNodeAsync(nodeId, context.CancellationToken);
+        await workPublisher.PublishTtsWorkAvailableAsync(null, null, context.CancellationToken);
         return new RegenerateNodeResponse();
     }
 
@@ -81,18 +95,18 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid run_id."));
         }
 
-        var run = await db.GenerationRuns.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Id == runId, context.CancellationToken);
+        using var uow = unitOfWorkFactory.CreateReadOnly("GetRunStatus");
+
+        var run = await runRepository.GetByKeyAsync(runId, context.CancellationToken);
 
         if (run is null)
         {
             throw new RpcException(new Status(StatusCode.NotFound, "Run not found."));
         }
 
-        var nodes = await db.GenerationNodes.AsNoTracking()
-            .Where(n => n.GenerationRunId == runId)
-            .OrderBy(n => n.DateCreated)
-            .ToListAsync(context.CancellationToken);
+        var nodes = await nodeRepository.GetByQueryAsync(
+            nodeQueryFactory.Create().ByRunId(runId).OrderByDateCreated(),
+            context.CancellationToken);
 
         var nodeMessages = nodes.Select(n =>
         {
@@ -128,20 +142,18 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id."));
         }
 
-        var run = await db.GenerationRuns.AsNoTracking()
-            .Where(r => r.ScreenplayId == screenplayId)
-            .OrderByDescending(r => r.DateCreated)
-            .FirstOrDefaultAsync(context.CancellationToken);
+        var run = await runRepository.GetFirstByQueryAsync(
+            runQueryFactory.Create().ByScreenplayId(screenplayId).OrderByDateCreatedDescending(),
+            context.CancellationToken);
 
         if (run is null)
         {
             throw new RpcException(new Status(StatusCode.NotFound, "No generation run found for this screenplay."));
         }
 
-        var nodes = await db.GenerationNodes.AsNoTracking()
-            .Where(n => n.GenerationRunId == run.Id)
-            .OrderBy(n => n.DateCreated)
-            .ToListAsync(context.CancellationToken);
+        var nodes = await nodeRepository.GetByQueryAsync(
+            nodeQueryFactory.Create().ByRunId(run.Id).OrderByDateCreated(),
+            context.CancellationToken);
 
         var nodeMessages = nodes.Select(n =>
         {
@@ -177,9 +189,9 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid node_id."));
         }
 
-        var artifact = await db.GeneratedArtifacts.AsNoTracking()
-            .Where(a => a.GenerationNodeId == nodeId && a.IsCurrent)
-            .FirstOrDefaultAsync(context.CancellationToken);
+        var artifact = await artifactRepository.GetFirstByQueryAsync(
+            artifactQueryFactory.Create().ByNodeId(nodeId).ByIsCurrent(true),
+            context.CancellationToken);
 
         if (artifact?.Metadata is null)
         {
@@ -213,20 +225,23 @@ public sealed class ContentGenerationGrpcService(
         while (!context.CancellationToken.IsCancellationRequested)
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var scopedDb = scope.ServiceProvider.GetRequiredService<ThePlotContext>();
+            var scopedRunRepo = scope.ServiceProvider.GetRequiredService<IGenerationRunRepository>();
+            var scopedNodeRepo = scope.ServiceProvider.GetRequiredService<IGenerationNodeRepository>();
+            var scopedNodeQueryFactory = scope.ServiceProvider.GetRequiredService<IQueryFactory<GenerationNode, IGenerationNodeQuery>>();
+            var scopedUowFactory = scope.ServiceProvider.GetRequiredService<IUnitOfWorkFactory>();
 
-            var run = await scopedDb.GenerationRuns.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.Id == runId, context.CancellationToken);
+            using var uow = scopedUowFactory.CreateReadOnly("StreamRunStatus");
+
+            var run = await scopedRunRepo.GetByKeyAsync(runId, context.CancellationToken);
 
             if (run is null)
             {
                 throw new RpcException(new Status(StatusCode.NotFound, "Run not found."));
             }
 
-            var nodes = await scopedDb.GenerationNodes.AsNoTracking()
-                .Where(n => n.GenerationRunId == runId)
-                .OrderBy(n => n.DateCreated)
-                .ToListAsync(context.CancellationToken);
+            var nodes = await scopedNodeRepo.GetByQueryAsync(
+                scopedNodeQueryFactory.Create().ByRunId(runId).OrderByDateCreated(),
+                context.CancellationToken);
 
             var changedNodes = new List<GenerationNodeStatusMessage>();
 
@@ -292,24 +307,24 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid screenplay_id."));
         }
 
-        var runs = await db.GenerationRuns.AsNoTracking()
-            .Where(r => r.ScreenplayId == screenplayId)
-            .OrderByDescending(r => r.DateCreated)
-            .ToListAsync(context.CancellationToken);
+        var runs = await runRepository.GetByQueryAsync(
+            runQueryFactory.Create().ByScreenplayId(screenplayId).OrderByDateCreatedDescending(),
+            context.CancellationToken);
 
         var runIds = runs.Select(r => r.Id).ToList();
 
-        var nodeCounts = await db.GenerationNodes.AsNoTracking()
-            .Where(n => runIds.Contains(n.GenerationRunId))
+        var allNodes = await nodeRepository.GetByQueryAsync(
+            nodeQueryFactory.Create().ByRunIds(runIds),
+            context.CancellationToken);
+
+        var nodeCounts = allNodes
             .GroupBy(n => n.GenerationRunId)
-            .Select(g => new
+            .ToDictionary(g => g.Key, g => new
             {
-                RunId = g.Key,
                 Total = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis),
                 Succeeded = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis && n.Status == GenerationNodeStatus.Succeeded),
                 Failed = g.Count(n => n.Kind != GenerationNodeKind.PreGenerationAnalysis && n.Status == GenerationNodeStatus.Failed),
-            })
-            .ToDictionaryAsync(x => x.RunId, context.CancellationToken);
+            });
 
         var response = new ListRunsForScreenplayResponse();
         foreach (var run in runs)
@@ -339,20 +354,19 @@ public sealed class ContentGenerationGrpcService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid run_id."));
         }
 
-        var run = await db.GenerationRuns.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Id == runId, context.CancellationToken);
+        using var uow = unitOfWorkFactory.CreateReadOnly("GetRunDetails");
+
+        var run = await runRepository.GetByKeyAsync(runId, context.CancellationToken);
 
         if (run is null)
         {
             throw new RpcException(new Status(StatusCode.NotFound, "Run not found."));
         }
 
-        var nodes = await db.GenerationNodes.AsNoTracking()
-            .Where(n => n.GenerationRunId == runId)
-            .OrderBy(n => n.DateCreated)
-            .ToListAsync(context.CancellationToken);
+        var nodes = await nodeRepository.GetByQueryAsync(
+            nodeQueryFactory.Create().ByRunId(runId).OrderByDateCreated(),
+            context.CancellationToken);
 
-        // Collect all voiceIds referenced in node payloads.
         var voiceIdSet = new HashSet<Guid>();
         var characterIdSet = new HashSet<Guid>();
         foreach (var node in nodes)
@@ -361,15 +375,18 @@ public sealed class ContentGenerationGrpcService(
         }
 
         var voiceMap = voiceIdSet.Count > 0
-            ? await db.Voices.AsNoTracking()
+            ? (await voiceRepository.GetByQueryAsync(
+                voiceQueryFactory.Create().ByScreenplayId(run.ScreenplayId),
+                context.CancellationToken))
                 .Where(v => voiceIdSet.Contains(v.Id))
-                .ToDictionaryAsync(v => v.Id, context.CancellationToken)
+                .ToDictionary(v => v.Id)
             : new Dictionary<Guid, Voice>();
 
         var characterMap = characterIdSet.Count > 0
-            ? await db.Characters.AsNoTracking()
-                .Where(c => characterIdSet.Contains(c.Id))
-                .ToDictionaryAsync(c => c.Id, c => c.Name, context.CancellationToken)
+            ? (await characterRepository.GetByQueryAsync(
+                characterQueryFactory.Create().ByIds(characterIdSet),
+                context.CancellationToken))
+                .ToDictionary(c => c.Id, c => c.Name)
             : new Dictionary<Guid, string>();
 
         var response = new GetRunDetailsResponse

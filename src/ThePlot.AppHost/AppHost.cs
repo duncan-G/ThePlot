@@ -89,6 +89,7 @@ serviceBus.AddServiceBusQueue("pdf-splitting-standard");
 serviceBus.AddServiceBusQueue("pdf-processing-priority");
 serviceBus.AddServiceBusQueue("pdf-processing-standard");
 serviceBus.AddServiceBusQueue("screenplay-import-status");
+serviceBus.AddServiceBusQueue("content-generation-work");
 
 grpcServer
     .WithReference(postgresDb)
@@ -136,9 +137,11 @@ var contentGenWorker = builder.AddProject<Projects.ThePlot_Workers_ContentGenera
     .WithReference(ttsServer)
     .WithReference(chatServer)
     .WithReference(embedServer)
+    .WithReference(serviceBus)
     .WithOtlpCollectorReference(otelCollector)
     .WaitFor(postgresDb)
     .WaitFor(schemaMigrations)
+    .WaitFor(serviceBus)
     .WaitFor(grpcServer);
 
 if (vllmContainer is not null)

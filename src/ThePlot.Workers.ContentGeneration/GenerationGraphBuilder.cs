@@ -1,46 +1,43 @@
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.ContentGeneration;
 using ThePlot.Core.SceneElements;
-using ThePlot.Core.Voices;
-using ThePlot.Infrastructure;
+using ThePlot.Core.Scenes;
+using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Workers.ContentGeneration;
 
-public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnalysisService _analysisService)
+public sealed class GenerationGraphBuilder(
+    IUnitOfWorkFactory unitOfWorkFactory,
+    IGenerationNodeRepository nodeRepository,
+    IGenerationEdgeRepository edgeRepository,
+    IQueryFactory<GenerationNode, IGenerationNodeQuery> nodeQueryFactory,
+    ISceneRepository sceneRepository,
+    ISceneElementRepository sceneElementRepository,
+    IQueryFactory<Scene, ISceneQuery> sceneQueryFactory,
+    IQueryFactory<SceneElement, ISceneElementQuery> sceneElementQueryFactory,
+    VoiceDeterminationService voiceDeterminationService,
+    PreGenerationAnalysisService _analysisService)
 {
     public async Task BuildGraphAsync(GenerationRun run, CancellationToken ct)
     {
-        if (await db.GenerationNodes.AnyAsync(n => n.GenerationRunId == run.Id, ct))
+        if (await nodeRepository.ExistsByQueryAsync(nodeQueryFactory.Create().ByRunId(run.Id), ct))
         {
             return;
         }
 
         var screenplayId = run.ScreenplayId;
-        var scenes = await db.Scenes
-            .AsNoTracking()
-            .Where(s => s.ScreenplayId == screenplayId)
-            .OrderBy(s => s.DateCreated)
-            .Select(s => new { s.Id })
-            .ToListAsync(ct);
+
+        var sceneIds = await sceneRepository.GetByQueryAsync(
+            sceneQueryFactory.Create().ByScreenplayId(screenplayId).OrderByDateCreated(),
+            s => s.Id,
+            ct);
 
         Guid narratorId;
         Dictionary<Guid, Guid> characterVoices;
         try
         {
-            narratorId = await db.Voices.AsNoTracking()
-                .Where(v => v.ScreenplayId == screenplayId && v.Role == VoiceRole.Narrator)
-                .Select(v => v.Id)
-                .FirstAsync(ct);
-
-            characterVoices = await db.Characters.AsNoTracking()
-                .Where(c => c.VoiceId != null)
-                .Join(
-                    db.Voices.AsNoTracking().Where(v => v.ScreenplayId == screenplayId),
-                    c => c.VoiceId,
-                    v => v.Id,
-                    (c, v) => new { c.Id, VoiceId = v.Id })
-                .ToDictionaryAsync(x => x.Id, x => x.VoiceId, ct);
+            narratorId = await voiceDeterminationService.GetNarratorVoiceIdAsync(screenplayId, ct);
+            characterVoices = await voiceDeterminationService.GetCharacterVoiceMapAsync(screenplayId, ct);
         }
         catch (InvalidOperationException)
         {
@@ -51,16 +48,14 @@ public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnaly
         var contentNodes = new List<GenerationNode>();
         var scenesWithElements = new List<(Guid SceneId, IReadOnlyList<SceneElement> Elements)>();
 
-        foreach (var scene in scenes)
+        foreach (var sceneId in sceneIds)
         {
-            var elements = await db.SceneElements.AsNoTracking()
-                .Where(e => e.SceneId == scene.Id)
-                .OrderBy(e => e.SequenceOrder)
-                .ToListAsync(ct);
+            var elements = await sceneElementRepository.GetByQueryAsync(
+                sceneElementQueryFactory.Create().BySceneIds([sceneId]).OrderBySequenceOrder(),
+                ct);
 
-            scenesWithElements.Add((scene.Id, elements));
+            scenesWithElements.Add((sceneId, elements));
 
-            var ordered = elements;
             List<DialogueBatchSegment>? batch = null;
 
             void FlushBatch()
@@ -71,7 +66,7 @@ public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnaly
                 }
 
                 var payload = JsonSerializer.SerializeToDocument(
-                    SceneElementBatching.LinesPayload(scene.Id, batch, characterVoices, narratorId));
+                    SceneElementBatching.LinesPayload(sceneId, batch, characterVoices, narratorId));
 
                 contentNodes.Add(GenerationNode.Create(
                     run.Id,
@@ -81,7 +76,7 @@ public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnaly
                 batch = null;
             }
 
-            foreach (var el in ordered)
+            foreach (var el in elements)
             {
                 if (SceneElementText.IsDialogueBatchMember(el.Type))
                 {
@@ -101,7 +96,7 @@ public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnaly
                         : GenerationNodeKind.ActionElement;
 
                     var payload = JsonSerializer.SerializeToDocument(
-                        SceneElementBatching.SingleElementPayload(scene.Id, el.Id, kind, narratorId, text));
+                        SceneElementBatching.SingleElementPayload(sceneId, el.Id, kind, narratorId, text));
 
                     contentNodes.Add(GenerationNode.Create(run.Id, kind, GenerationNodeStatus.Ready, payload));
                 }
@@ -124,29 +119,31 @@ public sealed class GenerationGraphBuilder(ThePlotContext db, PreGenerationAnaly
 
         analysisNode.SetAnalysisResult(runAnalysis);
 
+        using var uow = unitOfWorkFactory.CreateReadWrite("BuildGraph");
+
         if (!speakable)
         {
             analysisNode.MarkBlocked(blocking ?? "Pre-generation analysis reported speakability issues.");
-            db.GenerationNodes.Add(analysisNode);
-            await db.SaveChangesAsync(ct);
+            await nodeRepository.AddAsync(analysisNode, ct);
+            await uow.CommitAsync(ct);
             return;
         }
 
-        db.GenerationNodes.Add(analysisNode);
-        await db.SaveChangesAsync(ct);
+        await nodeRepository.AddAsync(analysisNode, ct);
+        await uow.SaveChangesAsync(ct);
 
         foreach (var n in contentNodes)
         {
-            db.GenerationNodes.Add(n);
+            await nodeRepository.AddAsync(n, ct);
         }
 
-        await db.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
 
         foreach (var n in contentNodes)
         {
-            db.GenerationEdges.Add(GenerationEdge.Create(analysisNode.Id, n.Id));
+            await edgeRepository.AddAsync(GenerationEdge.Create(analysisNode.Id, n.Id), ct);
         }
 
-        await db.SaveChangesAsync(ct);
+        await uow.CommitAsync(ct);
     }
 }

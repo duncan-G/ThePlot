@@ -1,20 +1,26 @@
 using System.Diagnostics;
-using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.ContentGeneration;
-using ThePlot.Infrastructure;
+using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Workers.ContentGeneration;
 
-public sealed class ContentGenerationRunService(ThePlotContext db)
+public sealed class ContentGenerationRunService(
+    IUnitOfWorkFactory unitOfWorkFactory,
+    IGenerationRunRepository runRepository,
+    IGenerationNodeRepository nodeRepository,
+    IQueryFactory<GenerationRun, IGenerationRunQuery> runQueryFactory,
+    IQueryFactory<GenerationNode, IGenerationNodeQuery> nodeQueryFactory)
 {
     public async Task<Guid> StartRunAsync(Guid screenplayId, bool cancelActive, CancellationToken ct)
     {
+        using var uow = unitOfWorkFactory.CreateReadWrite("StartRun");
         using var activity = ContentGenerationTelemetry.StartActivity("ContentGeneration.Run");
         activity?.SetTag("contentgen.screenplay_id", screenplayId.ToString());
 
-        var activeRun = await db.GenerationRuns
-            .FirstOrDefaultAsync(r => r.ScreenplayId == screenplayId
-                && (r.Status == GenerationRunStatus.Pending || r.Status == GenerationRunStatus.Running), ct);
+        var activeRunQuery = runQueryFactory.Create()
+            .ByScreenplayId(screenplayId)
+            .ByStatuses([GenerationRunStatus.Pending, GenerationRunStatus.Running]);
+        var activeRun = await runRepository.GetFirstByQueryAsync(activeRunQuery, ct);
 
         if (activeRun is not null)
         {
@@ -24,37 +30,36 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
                 throw new GenerationAlreadyActiveException(activeRun.Id, screenplayId);
             }
 
-            await CancelRunAsync(activeRun, ct);
+            await CancelRunAsync(uow, activeRun, ct);
             activity?.SetTag("contentgen.cancelled_run_id", activeRun.Id.ToString());
         }
 
         var traceParent = ContentGenerationTelemetry.FormatTraceParent(activity);
         var run = GenerationRun.Start(screenplayId, traceParent);
-        db.GenerationRuns.Add(run);
-        await db.SaveChangesAsync(ct);
+        await runRepository.AddAsync(run, ct);
+        await uow.CommitAsync(ct);
 
         activity?.SetTag("contentgen.run_id", run.Id.ToString());
         return run.Id;
     }
 
-    private async Task CancelRunAsync(GenerationRun run, CancellationToken ct)
+    private async Task CancelRunAsync(IUnitOfWork uow, GenerationRun run, CancellationToken ct)
     {
         run.MarkCancelled("Superseded by a new generation run.");
 
-        var activeNodes = await db.GenerationNodes
-            .Where(n => n.GenerationRunId == run.Id
-                && n.Status != GenerationNodeStatus.Succeeded
-                && n.Status != GenerationNodeStatus.Failed
-                && n.Status != GenerationNodeStatus.Blocked
-                && n.Status != GenerationNodeStatus.Cancelled)
-            .ToListAsync(ct);
+        var allNodes = await nodeRepository.GetByQueryAsync(
+            nodeQueryFactory.Create().ByRunId(run.Id), ct);
 
-        foreach (var node in activeNodes)
+        foreach (var node in allNodes.Where(n =>
+            n.Status != GenerationNodeStatus.Succeeded
+            && n.Status != GenerationNodeStatus.Failed
+            && n.Status != GenerationNodeStatus.Blocked
+            && n.Status != GenerationNodeStatus.Cancelled))
         {
             node.MarkCancelled();
         }
 
-        await db.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
     }
 
     /// <summary>
@@ -62,9 +67,13 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
     /// to <see cref="GenerationWorkflowPhase.VoiceDetermination"/> so the background worker
     /// picks it up for voice assignment and graph construction.
     /// </summary>
-    public async Task EnqueueVoiceDeterminationAsync(Guid runId, CancellationToken ct)
+    /// <returns>The run's stored trace-parent for distributed tracing continuity.</returns>
+    public async Task<string?> EnqueueVoiceDeterminationAsync(Guid runId, CancellationToken ct)
     {
-        var run = await db.GenerationRuns.FirstAsync(r => r.Id == runId, ct);
+        using var uow = unitOfWorkFactory.CreateReadWrite("EnqueueVoiceDetermination");
+
+        var run = await runRepository.GetByKeyAsync(runId, ct)
+            ?? throw new InvalidOperationException($"Generation run {runId} not found.");
 
         using var activity = ContentGenerationTelemetry.StartActivity(
             "ContentGeneration.EnqueueVoiceDetermination", run.TraceParent);
@@ -77,7 +86,9 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
 
         run.AdvanceToVoiceDeterminationPhase();
         run.MarkRunning();
-        await db.SaveChangesAsync(ct);
+        await uow.CommitAsync(ct);
+
+        return run.TraceParent;
     }
 
     /// <summary>
@@ -91,7 +102,11 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
         GenerationGraphBuilder graphBuilder,
         CancellationToken ct)
     {
-        var run = await db.GenerationRuns.FirstAsync(r => r.Id == runId, ct);
+        using var uow = unitOfWorkFactory.CreateReadWrite("ProcessVoiceDetermination");
+
+        var run = await runRepository.GetByKeyAsync(runId, ct)
+            ?? throw new InvalidOperationException($"Generation run {runId} not found.");
+
         if (run.Phase != GenerationWorkflowPhase.VoiceDetermination)
         {
             throw new InvalidOperationException("Run is not in voice-determination phase.");
@@ -104,7 +119,7 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
         }
 
         run.AdvanceToContentGenerationPhase();
-        await db.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
 
         using (var graphSpan = ContentGenerationTelemetry.StartActivity("ContentGeneration.BuildGraph"))
         {
@@ -112,29 +127,35 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
             await graphBuilder.BuildGraphAsync(run, ct);
         }
 
-        var analysisBlocked = await db.GenerationNodes.AnyAsync(
-            n => n.GenerationRunId == runId
-                && n.Kind == GenerationNodeKind.PreGenerationAnalysis
-                && n.Status == GenerationNodeStatus.Blocked,
-            ct);
+        var analysisQuery = nodeQueryFactory.Create()
+            .ByRunId(runId)
+            .ByKind(GenerationNodeKind.PreGenerationAnalysis)
+            .ByStatus(GenerationNodeStatus.Blocked);
+        var analysisBlocked = await nodeRepository.ExistsByQueryAsync(analysisQuery, ct);
 
         if (analysisBlocked)
         {
-            var analysisNode = await db.GenerationNodes.FirstAsync(
-                n => n.GenerationRunId == runId && n.Kind == GenerationNodeKind.PreGenerationAnalysis,
-                ct);
+            var analysisNodeQuery = nodeQueryFactory.Create()
+                .ByRunId(runId)
+                .ByKind(GenerationNodeKind.PreGenerationAnalysis);
+            var analysisNode = await nodeRepository.GetFirstByQueryAsync(analysisNodeQuery, ct)
+                ?? throw new InvalidOperationException("Pre-generation analysis node not found.");
 
             Activity.Current?.SetTag("contentgen.analysis_blocked", true);
             run.MarkFailed(analysisNode.LastErrorMessage ?? "Pre-generation analysis blocked the run.");
-            await db.SaveChangesAsync(ct);
         }
+
+        await uow.CommitAsync(ct);
     }
 
     public async Task ReplayRunAsync(Guid runId, CancellationToken ct)
     {
-        var nodes = await db.GenerationNodes
-            .Where(n => n.GenerationRunId == runId && n.Status != GenerationNodeStatus.Succeeded)
-            .ToListAsync(ct);
+        using var uow = unitOfWorkFactory.CreateReadWrite("ReplayRun");
+
+        var nodeQuery = nodeQueryFactory.Create()
+            .ByRunId(runId)
+            .ByNotStatus(GenerationNodeStatus.Succeeded);
+        var nodes = await nodeRepository.GetByQueryAsync(nodeQuery, ct);
 
         foreach (var node in nodes)
         {
@@ -152,17 +173,22 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
             node.MarkReady();
         }
 
-        var run = await db.GenerationRuns.FirstAsync(r => r.Id == runId, ct);
+        var run = await runRepository.GetByKeyAsync(runId, ct)
+            ?? throw new InvalidOperationException($"Generation run {runId} not found.");
         run.MarkRunning();
-        await db.SaveChangesAsync(ct);
+        await uow.CommitAsync(ct);
     }
 
     public async Task RegenerateNodeAsync(Guid nodeId, CancellationToken ct)
     {
-        var node = await db.GenerationNodes
-            .Include(n => n.Artifacts)
-            .Include(n => n.GenerationRun)
-            .FirstAsync(n => n.Id == nodeId, ct);
+        using var uow = unitOfWorkFactory.CreateReadWrite("RegenerateNode");
+
+        var nodeQuery = nodeQueryFactory.Create()
+            .ById(nodeId)
+            .IncludeArtifacts()
+            .IncludeRun();
+        var node = await nodeRepository.GetFirstByQueryAsync(nodeQuery, ct)
+            ?? throw new InvalidOperationException($"Generation node {nodeId} not found.");
 
         foreach (var artifact in (node.Artifacts ?? []).Where(a => a.IsCurrent))
         {
@@ -177,6 +203,6 @@ public sealed class ContentGenerationRunService(ThePlotContext db)
             run.MarkRunning();
         }
 
-        await db.SaveChangesAsync(ct);
+        await uow.CommitAsync(ct);
     }
 }

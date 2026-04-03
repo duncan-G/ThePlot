@@ -16,7 +16,7 @@ public static class PostgresResourceBuilderExtensions
             {
                 container
                     .WithPgVector(InitFilesPath)
-                    .WithVolume("theplot-volume", "/var/lib/postgresql")
+                    .WithVolume("theplot-db", "/var/lib/postgresql")
                     .WithPgAdmin();
             });
         }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using ThePlot.Core.Characters;
+using ThePlot.Core.ContentGeneration;
 using ThePlot.Core.Locations;
 using ThePlot.Core.SceneElements;
 using ThePlot.Core.Scenes;
@@ -9,6 +10,7 @@ using ThePlot.Core.ScreenplayImports;
 using ThePlot.Core.Screenplays;
 using ThePlot.Core.Voices;
 using ThePlot.Infrastructure.Characters;
+using ThePlot.Infrastructure.ContentGeneration;
 using ThePlot.Infrastructure.Locations;
 using ThePlot.Infrastructure.SceneElements;
 using ThePlot.Infrastructure.Scenes;
@@ -52,7 +54,12 @@ public static class DatabaseExtensions
             .AddScoped<ISceneElementRepository, SceneElementRepository>()
             .AddScoped<ICharacterRepository, CharacterRepository>()
             .AddScoped<IVoiceRepository, VoiceRepository>()
-            .AddScoped<ILocationRepository, LocationRepository>();
+            .AddScoped<ILocationRepository, LocationRepository>()
+            .AddScoped<IGenerationRunRepository, GenerationRunRepository>()
+            .AddScoped<IGenerationNodeRepository, GenerationNodeRepository>()
+            .AddScoped<IGenerationAttemptRepository, GenerationAttemptRepository>()
+            .AddScoped<IGeneratedArtifactRepository, GeneratedArtifactRepository>()
+            .AddScoped<IGenerationEdgeRepository, GenerationEdgeRepository>();
     }
 
     private static void AddQueries(this IServiceCollection services)
@@ -64,7 +71,11 @@ public static class DatabaseExtensions
             .AddScoped<ISceneElementQuery, SceneElementQuery>()
             .AddScoped<ICharacterQuery, CharacterQuery>()
             .AddScoped<IVoiceQuery, VoiceQuery>()
-            .AddScoped<ILocationQuery, LocationQuery>();
+            .AddScoped<ILocationQuery, LocationQuery>()
+            .AddScoped<IGenerationRunQuery, GenerationRunQuery>()
+            .AddScoped<IGenerationNodeQuery, GenerationNodeQuery>()
+            .AddScoped<IGenerationAttemptQuery, GenerationAttemptQuery>()
+            .AddScoped<IGeneratedArtifactQuery, GeneratedArtifactQuery>();
     }
 
     private static void AddQueryFactories(this IServiceCollection services)
@@ -76,6 +87,10 @@ public static class DatabaseExtensions
             .AddScoped<IQueryFactory<SceneElement, ISceneElementQuery>, QueryFactory<SceneElement, SceneElementQuery>>()
             .AddScoped<IQueryFactory<Character, ICharacterQuery>, QueryFactory<Character, CharacterQuery>>()
             .AddScoped<IQueryFactory<Voice, IVoiceQuery>, QueryFactory<Voice, VoiceQuery>>()
-            .AddScoped<IQueryFactory<Location, ILocationQuery>, QueryFactory<Location, LocationQuery>>();
+            .AddScoped<IQueryFactory<Location, ILocationQuery>, QueryFactory<Location, LocationQuery>>()
+            .AddScoped<IQueryFactory<GenerationRun, IGenerationRunQuery>, QueryFactory<GenerationRun, GenerationRunQuery>>()
+            .AddScoped<IQueryFactory<GenerationNode, IGenerationNodeQuery>, QueryFactory<GenerationNode, GenerationNodeQuery>>()
+            .AddScoped<IQueryFactory<GenerationAttempt, IGenerationAttemptQuery>, QueryFactory<GenerationAttempt, GenerationAttemptQuery>>()
+            .AddScoped<IQueryFactory<GeneratedArtifact, IGeneratedArtifactQuery>, QueryFactory<GeneratedArtifact, GeneratedArtifactQuery>>();
     }
 }

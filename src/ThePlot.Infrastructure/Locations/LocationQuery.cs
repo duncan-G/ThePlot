@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.Locations;
+using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Infrastructure.Locations;
 
-public sealed class LocationQuery(ThePlotContext context) : ILocationQuery
+internal sealed class LocationQuery(ThePlotContext context) : ILocationQuery, IExecutableQuery<Location>
 {
     private IQueryable<Location> _query = context.Locations.AsNoTracking();
 
-    public IQueryable<Location> AsQueryable() => _query;
+    IQueryable<Location> IExecutableQuery<Location>.AsQueryable() => _query;
 
     public ILocationQuery ByIds(IEnumerable<Guid> ids)
     {

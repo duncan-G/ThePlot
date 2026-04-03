@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ThePlot.Core.ContentGeneration;
+using ThePlot.Core.ScreenplayImports;
 using ThePlot.Infrastructure.Embeddings;
 using ThePlot.Infrastructure.Tts;
 
@@ -13,7 +15,8 @@ public static class ContentGenerationServiceCollectionExtensions
     {
         services.Configure<ContentGenerationOptions>(
             configuration.GetSection(ContentGenerationOptions.SectionName));
-        services.AddScoped<GenerationNodeClaimService>();
+        services.AddScoped<IGenerationNodeClaimService, GenerationNodeClaimService>();
+        services.AddScoped<IChunkReconciliationService, ChunkReconciliationService>();
         services.AddTtsSpeechClient();
         services.AddEmbeddingClient();
         return services;

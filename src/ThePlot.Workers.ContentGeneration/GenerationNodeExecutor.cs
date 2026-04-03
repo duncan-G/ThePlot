@@ -2,31 +2,38 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ThePlot.Core.ContentGeneration;
-using ThePlot.Infrastructure;
+using ThePlot.Database.Abstractions;
 using ThePlot.Infrastructure.ContentGeneration;
 
 namespace ThePlot.Workers.ContentGeneration;
 
 public sealed class GenerationNodeExecutor(
-    ThePlotContext db,
+    IUnitOfWorkFactory unitOfWorkFactory,
+    IGenerationRunRepository runRepository,
+    IGenerationNodeRepository nodeRepository,
+    IGenerationAttemptRepository attemptRepository,
+    IGeneratedArtifactRepository artifactRepository,
+    IQueryFactory<GenerationNode, IGenerationNodeQuery> nodeQueryFactory,
+    IQueryFactory<GeneratedArtifact, IGeneratedArtifactQuery> artifactQueryFactory,
     ITextToSpeechClient ttsClient,
     IOptions<ContentGenerationOptions> options,
     ILogger<GenerationNodeExecutor> logger)
 {
     public async Task ExecuteAsync(ClaimedGenerationWork work, string workerId, CancellationToken ct)
     {
+        using var uow = unitOfWorkFactory.CreateReadWrite("ExecuteNode");
         var opt = options.Value;
-        var node = await db.GenerationNodes
-            .Include(n => n.GenerationRun)
-            .FirstAsync(n => n.Id == work.NodeId, ct);
+
+        var node = await nodeRepository.GetByKeyAsync(work.NodeId, ct)
+                   ?? throw new InvalidOperationException($"Generation node {work.NodeId} not found.");
+        var run = await runRepository.GetByKeyAsync(node.GenerationRunId, ct);
 
         using var activity = ContentGenerationTelemetry.StartActivity(
-            "ContentGeneration.ExecuteNode", node.GenerationRun?.TraceParent);
+            "ContentGeneration.ExecuteNode", run?.TraceParent);
         activity?.SetTag("contentgen.run_id", node.GenerationRunId.ToString());
         activity?.SetTag("contentgen.node_id", node.Id.ToString());
         activity?.SetTag("contentgen.node_kind", node.Kind.ToString());
@@ -42,7 +49,7 @@ public sealed class GenerationNodeExecutor(
             return;
         }
 
-        if (node.GenerationRun?.Status == GenerationRunStatus.Cancelled
+        if (run?.Status == GenerationRunStatus.Cancelled
             || node.Status == GenerationNodeStatus.Cancelled)
         {
             logger.LogInformation("Skipping node {NodeId}; run or node was cancelled.", work.NodeId);
@@ -50,14 +57,15 @@ public sealed class GenerationNodeExecutor(
             return;
         }
 
-        var attempt = await db.GenerationAttempts.FirstAsync(a => a.Id == work.AttemptId, ct);
+        var attempt = await attemptRepository.GetByKeyAsync(work.AttemptId, ct)
+                      ?? throw new InvalidOperationException($"Generation attempt {work.AttemptId} not found.");
 
         try
         {
             switch (node.Kind)
             {
                 case GenerationNodeKind.PreGenerationAnalysis:
-                    await ExecuteAnalysisAsync(node, attempt, ct);
+                    ExecuteAnalysis(node, attempt, run);
                     break;
                 case GenerationNodeKind.VoicePromptBatch:
                 case GenerationNodeKind.ActionElement:
@@ -69,8 +77,8 @@ public sealed class GenerationNodeExecutor(
             }
 
             activity?.SetTag("contentgen.node_result", "succeeded");
-            await db.SaveChangesAsync(ct);
-            await TryCompleteRunIfAllSucceededAsync(node.GenerationRunId, ct);
+            await uow.SaveChangesAsync(ct);
+            await TryCompleteRunIfAllSucceededAsync(node.GenerationRunId, uow, ct);
         }
         catch (Exception ex)
         {
@@ -80,12 +88,12 @@ public sealed class GenerationNodeExecutor(
             var backoffSeconds = Math.Pow(2, node.RetryCount) * opt.RetryBackoffBase.TotalSeconds;
             var runnableAfter = DateTime.UtcNow.AddSeconds(Math.Clamp(backoffSeconds, 1, 3600));
             node.MarkNeedsRetry(ex.Message, runnableAfter, opt.MaxRetryAttemptsPerNode);
-            await db.SaveChangesAsync(ct);
+            await uow.SaveChangesAsync(ct);
 
             if (node.Status == GenerationNodeStatus.Failed)
             {
                 activity?.SetTag("contentgen.node_result", "failed_permanently");
-                await MarkRunFailedIfNeededAsync(node.GenerationRunId, ex.Message, ct);
+                await MarkRunFailedIfNeededAsync(node.GenerationRunId, ex.Message, uow, ct);
             }
             else
             {
@@ -93,9 +101,11 @@ public sealed class GenerationNodeExecutor(
                 activity?.SetTag("contentgen.retry_count", node.RetryCount);
             }
         }
+
+        await uow.CommitAsync(ct);
     }
 
-    private Task ExecuteAnalysisAsync(GenerationNode node, GenerationAttempt attempt, CancellationToken ct)
+    private static void ExecuteAnalysis(GenerationNode node, GenerationAttempt attempt, GenerationRun? run)
     {
         if (node.AnalysisResult is null)
         {
@@ -110,17 +120,12 @@ public sealed class GenerationNodeExecutor(
                 : "Speakability check failed.";
             node.MarkBlocked(reason);
             attempt.MarkFailed(reason);
-            if (node.GenerationRun is not null)
-            {
-                node.GenerationRun.MarkFailed(reason);
-            }
-
-            return Task.CompletedTask;
+            run?.MarkFailed(reason);
+            return;
         }
 
         attempt.MarkSucceeded(JsonSerializer.SerializeToDocument(new { ok = true }));
         node.MarkSucceeded();
-        return Task.CompletedTask;
     }
 
     private async Task ExecuteTtsAsync(GenerationNode node, GenerationAttempt attempt, CancellationToken ct)
@@ -151,14 +156,15 @@ public sealed class GenerationNodeExecutor(
             metadata: JsonSerializer.SerializeToDocument(
                 new { AudioBase64 = audioRaw, AudioFormat = audioFormat, lengthChars = prompt.Length }));
 
-        foreach (var old in await db.GeneratedArtifacts
-                     .Where(a => a.GenerationNodeId == node.Id && a.IsCurrent)
-                     .ToListAsync(ct))
+        var currentArtifacts = await artifactRepository.GetByQueryAsync(
+            artifactQueryFactory.Create().ByNodeId(node.Id).ByIsCurrent(true), ct);
+
+        foreach (var old in currentArtifacts)
         {
             old.Supersede();
         }
 
-        db.GeneratedArtifacts.Add(artifact);
+        await artifactRepository.AddAsync(artifact, ct);
         attempt.MarkSucceeded(
             JsonSerializer.SerializeToDocument(new { format = audioFormat, contentHash = hash }));
 
@@ -199,28 +205,29 @@ public sealed class GenerationNodeExecutor(
         return TextNormalizer.Normalize(raw);
     }
 
-    private async Task TryCompleteRunIfAllSucceededAsync(Guid runId, CancellationToken ct)
+    private async Task TryCompleteRunIfAllSucceededAsync(Guid runId, IUnitOfWork uow, CancellationToken ct)
     {
-        var hasPending = await db.GenerationNodes
-            .AnyAsync(n => n.GenerationRunId == runId && n.Status != GenerationNodeStatus.Succeeded, ct);
+        var hasPending = await nodeRepository.ExistsByQueryAsync(
+            nodeQueryFactory.Create().ByRunId(runId).ByNotStatus(GenerationNodeStatus.Succeeded), ct);
 
         if (!hasPending)
         {
-            var run = await db.GenerationRuns.FirstAsync(r => r.Id == runId, ct);
+            var run = await runRepository.GetByKeyAsync(runId, ct)
+                      ?? throw new InvalidOperationException($"Generation run {runId} not found.");
             run.MarkCompleted();
-            await db.SaveChangesAsync(ct);
+            await uow.SaveChangesAsync(ct);
         }
     }
 
-    private async Task MarkRunFailedIfNeededAsync(Guid runId, string message, CancellationToken ct)
+    private async Task MarkRunFailedIfNeededAsync(Guid runId, string message, IUnitOfWork uow, CancellationToken ct)
     {
-        var run = await db.GenerationRuns.FirstOrDefaultAsync(r => r.Id == runId, ct);
+        var run = await runRepository.GetByKeyAsync(runId, ct);
         if (run is null)
         {
             return;
         }
 
         run.MarkFailed($"Node failed after retries: {message}");
-        await db.SaveChangesAsync(ct);
+        await uow.SaveChangesAsync(ct);
     }
 }

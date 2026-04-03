@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.Characters;
+using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Infrastructure.Characters;
 
-public sealed class CharacterQuery(ThePlotContext context) : ICharacterQuery
+internal sealed class CharacterQuery(ThePlotContext context) : ICharacterQuery, IExecutableQuery<Character>
 {
     private IQueryable<Character> _query = context.Characters.AsNoTracking();
 
-    public IQueryable<Character> AsQueryable() => _query;
+    IQueryable<Character> IExecutableQuery<Character>.AsQueryable() => _query;
 
     public ICharacterQuery ByIds(IEnumerable<Guid> ids)
     {

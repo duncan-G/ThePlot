@@ -19,4 +19,8 @@
     <ProjectReference Include="..\ThePlot.Core\ThePlot.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThePlot.SchemaMigrations" />
+  </ItemGroup>
+
 </Project>

@@ -13,7 +13,7 @@ using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Infrastructure;
 
-public sealed class ThePlotContext(
+internal sealed class ThePlotContext(
     DbContextOptions<ThePlotContext> options,
     QueryFilterService queryFilterService,
     UserContext userContext)

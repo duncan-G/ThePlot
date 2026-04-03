@@ -20,6 +20,8 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
                                              throw new InvalidOperationException(
                                                  "No active unit of work found in the current context.");
 
+    private static IQueryable<TEntity> Queryable(IQuery<TEntity> query) =>
+        ((IExecutableQuery<TEntity>)query).AsQueryable();
 
     public virtual async Task<bool> ExistsByKeyAsync(TKey key, CancellationToken cancellationToken = default)
     {
@@ -31,7 +33,6 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
             throw new InvalidOperationException("Entity does not have a primary key.");
         }
 
-        // Build the lambda: e => EF.Property<TKey>(e, keyPropertyName) == id
         ParameterExpression parameter = Expression.Parameter(typeof(TEntity), "e");
         MethodCallExpression propertyExpression = Expression.Call(
             typeof(EF),
@@ -53,7 +54,7 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
             Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(ExistsByQueryAsync)}",
                 ActivityKind.Server);
 
-        return query.AsQueryable().AnyAsync(cancellationToken);
+        return Queryable(query).AnyAsync(cancellationToken);
     }
 
     public virtual async Task<TEntity?> GetByKeyAsync(TKey key, CancellationToken cancellationToken = default)
@@ -65,13 +66,44 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
         return await DbSet.FindAsync([key], cancellationToken);
     }
 
+    public virtual async Task<TEntity?> GetFirstByQueryAsync(IQuery<TEntity> query,
+        CancellationToken cancellationToken = default)
+    {
+        using Activity? activity =
+            Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(GetFirstByQueryAsync)}",
+                ActivityKind.Server);
+
+        return await Queryable(query).FirstOrDefaultAsync(cancellationToken);
+    }
+
     public virtual async Task<IReadOnlyList<TEntity>> GetByQueryAsync(IQuery<TEntity> query,
         CancellationToken cancellationToken = default)
     {
         using Activity? activity =
             Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(GetByQueryAsync)}", ActivityKind.Server);
 
-        return await query.AsQueryable().ToListAsync(cancellationToken);
+        return await Queryable(query).ToListAsync(cancellationToken);
+    }
+
+    public virtual async Task<IReadOnlyList<TResult>> GetByQueryAsync<TResult>(IQuery<TEntity> query,
+        Expression<Func<TEntity, TResult>> selector,
+        CancellationToken cancellationToken = default)
+    {
+        using Activity? activity =
+            Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(GetByQueryAsync)}", ActivityKind.Server);
+
+        return await Queryable(query).Select(selector).ToListAsync(cancellationToken);
+    }
+
+    public virtual async Task<TResult?> GetFirstByQueryAsync<TResult>(IQuery<TEntity> query,
+        Expression<Func<TEntity, TResult>> selector,
+        CancellationToken cancellationToken = default)
+    {
+        using Activity? activity =
+            Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(GetFirstByQueryAsync)}",
+                ActivityKind.Server);
+
+        return await Queryable(query).Select(selector).FirstOrDefaultAsync(cancellationToken);
     }
 
     public virtual async Task<PageResponse<TEntity>> GetByQueryPagedAsync<TSort>(
@@ -83,12 +115,10 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
             Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(GetByQueryPagedAsync)}",
                 ActivityKind.Server);
         activity?.AddTag("PagingToken", pagingToken.ToString());
-        IQueryable<TEntity> queryable = query.AsQueryable();
+        IQueryable<TEntity> queryable = Queryable(query);
 
         if (pagingToken.Cursor is { } pagingCursor)
         {
-            // Build an expression equivalent to:
-            // e => (e.Order < LastOrderValue) || (e.Order == LastOrderValue && e.Pk < LastPkValue)
             ParameterExpression param = Expression.Parameter(typeof(TEntity), "e");
 
             InvocationExpression sortKeyBody = Expression.Invoke(pagingToken.SortKeySelector, param);
@@ -99,16 +129,11 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
             ConstantExpression lastPrimaryKeyValueConst =
                 Expression.Constant(pagingCursor.LastPrimaryKeyValue, typeof(TKey));
 
-            // e.SortKey < LastSortKeyValue
             BinaryExpression sortKeyLessThan = Expression.LessThan(sortKeyBody, lastSortKeyValueConst);
-            // e.SortKey == LastSortKeyValue
             BinaryExpression sortKeyEqual = Expression.Equal(sortKeyBody, lastSortKeyValueConst);
-            // e.PrimaryKey < LastPkValue
             BinaryExpression primaryKeyLessThan = Expression.LessThan(primaryKeyBody, lastPrimaryKeyValueConst);
 
-            // (e.Order == LastOrderValue && e.Pk < LastPkValue)
             BinaryExpression combinedSubPredicate = Expression.AndAlso(sortKeyEqual, primaryKeyLessThan);
-            // (e.Order < LastOrderValue) || (combinedSubPredicate)
             BinaryExpression compositePredicate = Expression.OrElse(sortKeyLessThan, combinedSubPredicate);
 
             Expression<Func<TEntity, bool>> whereLambda =
@@ -175,7 +200,19 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
             Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(UpdateByQueryAsync)}",
                 ActivityKind.Server);
 
-        return await query.AsQueryable().ExecuteUpdateAsync(setPropertyCalls, cancellationToken);
+        return await Queryable(query).ExecuteUpdateAsync(setPropertyCalls, cancellationToken);
+    }
+
+    public virtual async Task<int> DeleteByQueryAsync(IQuery<TEntity> query,
+        CancellationToken cancellationToken = default)
+    {
+        await VerifyReadWriteUnitOfWork();
+
+        using Activity? activity =
+            Activity.Current?.Source.StartActivity($"{GetType().Name}.{nameof(DeleteByQueryAsync)}",
+                ActivityKind.Server);
+
+        return await Queryable(query).ExecuteDeleteAsync(cancellationToken);
     }
 
     public virtual async Task RemoveAsync(TEntity entity, CancellationToken cancellationToken = default)
@@ -191,14 +228,21 @@ public abstract class Repository<TEntity, TKey>(PagingTokenHelper pagingTokenHel
 
     private async Task VerifyReadWriteUnitOfWork()
     {
-        if (UnitOfWork is ReadOnlyUnitOfWork)
+        switch (UnitOfWork)
         {
-            throw new InvalidOperationException("Cannot use ReadOnly unit of work when writing to the database.");
-        }
+            case ReadOnlyUnitOfWork:
+                throw new InvalidOperationException("Cannot use ReadOnly unit of work when writing to the database.");
 
-        if (UnitOfWork is ReadWriteUnitOfWork readWriteUnitOfWork)
-        {
-            await readWriteUnitOfWork.EnsureTransactionAsync();
+            case NestedUnitOfWork { IsReadWrite: false }:
+                throw new InvalidOperationException("Cannot use ReadOnly unit of work when writing to the database.");
+
+            case NestedUnitOfWork nestedUnitOfWork:
+                await nestedUnitOfWork.EnsureTransactionAsync();
+                break;
+
+            case ReadWriteUnitOfWork readWriteUnitOfWork:
+                await readWriteUnitOfWork.EnsureTransactionAsync();
+                break;
         }
     }
 

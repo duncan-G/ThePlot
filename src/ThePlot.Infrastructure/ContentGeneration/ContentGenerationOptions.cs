@@ -16,7 +16,7 @@ public sealed class ContentGenerationOptions
     /// Number of TTS nodes to claim and dispatch concurrently per worker cycle,
     /// allowing vLLM to batch requests rather than process them one at a time.
     /// </summary>
-    public int TtsBatchSize { get; set; } = 4;
+    public int TtsBatchSize { get; set; } = 24;
 
     /// <summary>Pricing for the chat/LLM client (cost per 1M tokens). Zero for local models.</summary>
     public ModelPricing ChatPricing { get; set; } = ModelPricing.Zero;

@@ -415,39 +415,68 @@
                       </div>
                     } @else if (selectedRunDetails()) {
 
-                      <!-- Filter bar -->
-                      <div class="flex flex-wrap items-center gap-1.5 border-t border-border px-3 py-2.5 bg-muted/30">
-                        @for (f of nodeFilterOptions; track f.value) {
-                          <button type="button" (click)="setNodeFilter(f.value)"
-                            [class]="'flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px] transition-colors '
-                              + (nodeStatusFilter() === f.value
-                                ? (f.value === 'succeeded' ? 'bg-green-500/20 text-green-500' :
-                                   f.value === 'failed'    ? 'bg-destructive/20 text-destructive' :
-                                   f.value === 'pending'   ? 'bg-primary/15 text-primary' :
-                                   'bg-accent text-foreground')
-                                : 'text-muted-foreground hover:bg-accent hover:text-foreground')">
-                            @if (f.value === 'succeeded') {
-                              <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                            } @else if (f.value === 'failed') {
-                              <span class="h-1.5 w-1.5 rounded-full bg-destructive"></span>
-                            } @else if (f.value === 'pending') {
-                              <span class="h-1.5 w-1.5 rounded-full bg-primary/80"></span>
+                      <!-- Filter bar: status + node type (combined) -->
+                      <div class="space-y-2 border-t border-border bg-muted/30 px-3 py-2.5">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                          <span class="w-full font-mono text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:w-auto sm:shrink-0">
+                            Generation status
+                          </span>
+                          <div class="flex flex-wrap items-center gap-1.5">
+                            @for (f of nodeFilterOptions; track f.value) {
+                              <button type="button" (click)="setNodeFilter(f.value)"
+                                [class]="'flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[10px] transition-colors '
+                                  + (nodeStatusFilter() === f.value
+                                    ? (f.value === 'succeeded' ? 'bg-green-500/20 text-green-500' :
+                                       f.value === 'failed'    ? 'bg-destructive/20 text-destructive' :
+                                       f.value === 'pending'   ? 'bg-primary/15 text-primary' :
+                                       'bg-accent text-foreground')
+                                    : 'text-muted-foreground hover:bg-accent hover:text-foreground')">
+                                @if (f.value === 'succeeded') {
+                                  <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                                } @else if (f.value === 'failed') {
+                                  <span class="h-1.5 w-1.5 rounded-full bg-destructive"></span>
+                                } @else if (f.value === 'pending') {
+                                  <span class="h-1.5 w-1.5 rounded-full bg-primary/80"></span>
+                                }
+                                {{ f.label }}
+                                <span class="opacity-60">
+                                  ({{ f.value === 'all' ? nodeFilterCounts().all
+                                    : f.value === 'succeeded' ? nodeFilterCounts().succeeded
+                                    : f.value === 'failed'    ? nodeFilterCounts().failed
+                                    : nodeFilterCounts().pending }})
+                                </span>
+                              </button>
                             }
-                            {{ f.label }}
-                            <span class="opacity-60">
-                              ({{ f.value === 'all' ? nodeFilterCounts().all
-                                : f.value === 'succeeded' ? nodeFilterCounts().succeeded
-                                : f.value === 'failed'    ? nodeFilterCounts().failed
-                                : nodeFilterCounts().pending }})
-                            </span>
-                          </button>
-                        }
+                          </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-border/60 pt-2">
+                          <span class="w-full font-mono text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:w-auto sm:shrink-0">
+                            Node type
+                          </span>
+                          <div class="flex flex-wrap items-center gap-1.5">
+                            @for (k of nodeKindFilterOptions; track k.value) {
+                              <button type="button" (click)="setNodeKindFilter(k.value)"
+                                [class]="'rounded-full px-2.5 py-1 font-mono text-[10px] transition-colors '
+                                  + (nodeKindFilter() === k.value
+                                    ? 'bg-secondary text-secondary-foreground ring-1 ring-border'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-foreground')">
+                                {{ k.label }}
+                                <span class="opacity-60">
+                                  ({{ k.value === 'all' ? nodeKindFilterCounts().all
+                                    : k.value === 'VoicePromptBatch' ? nodeKindFilterCounts().VoicePromptBatch
+                                    : k.value === 'ActionElement' ? nodeKindFilterCounts().ActionElement
+                                    : nodeKindFilterCounts().VoiceOverElement }})
+                                </span>
+                              </button>
+                            }
+                          </div>
+                        </div>
                       </div>
 
                       <!-- Scenes with nodes -->
                       @if (groupedNodes().length === 0) {
                         <div class="border-t border-border px-4 py-6 text-center font-mono text-xs text-muted-foreground">
-                          No nodes match this filter.
+                          No nodes match the selected status and node type filters.
                         </div>
                       } @else {
                         <div class="border-t border-border">
@@ -1171,6 +1200,10 @@
               }
             </div>
           }
+        } @empty {
+          <div class="flex items-center justify-center py-4">
+            <p class="font-mono text-xs text-muted-foreground/60">Processing...</p>
+          </div>
         }
       </div>
 

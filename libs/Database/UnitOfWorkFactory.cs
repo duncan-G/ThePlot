@@ -9,28 +9,47 @@ public sealed class UnitOfWorkFactory(IDbContext dbContext) : IUnitOfWorkFactory
 
     public IUnitOfWork CreateReadOnly(string operationName)
     {
-        VerifyNestedUnitOfWork();
-
         Activity? activity = ActivitySource.StartActivity($"Start UnitOfWork: {operationName}");
-        ReadOnlyUnitOfWork unitOfWork = new(dbContext, activity);
-        return unitOfWork;
+
+        if (UnitOfWorkContext.Current != null)
+        {
+            return new NestedUnitOfWork(UnitOfWorkContext.Current, isReadWrite: false, activity);
+        }
+
+        return new ReadOnlyUnitOfWork(dbContext, activity);
     }
 
     public IUnitOfWork CreateReadWrite(string operationName)
     {
-        VerifyNestedUnitOfWork();
-
         Activity? activity = ActivitySource.StartActivity($"Start UnitOfWork: {operationName}");
-        ReadWriteUnitOfWork unitOfWork = new(dbContext, activity);
-        return unitOfWork;
-    }
 
-    private void VerifyNestedUnitOfWork()
-    {
         if (UnitOfWorkContext.Current != null)
         {
-            throw new InvalidOperationException(
-                "A unit of work has already been created. Nesting unit of works is currently not supported.");
+            VerifyParentSupportsReadWrite(UnitOfWorkContext.Current);
+            return new NestedUnitOfWork(UnitOfWorkContext.Current, isReadWrite: true, activity);
         }
+
+        return new ReadWriteUnitOfWork(dbContext, activity);
+    }
+
+    private static void VerifyParentSupportsReadWrite(IUnitOfWork parent)
+    {
+        IUnitOfWork root = GetRoot(parent);
+
+        if (root is ReadOnlyUnitOfWork)
+        {
+            throw new InvalidOperationException(
+                "Cannot create a read-write unit of work nested inside a read-only unit of work.");
+        }
+    }
+
+    private static IUnitOfWork GetRoot(IUnitOfWork unitOfWork)
+    {
+        while (unitOfWork is NestedUnitOfWork nested)
+        {
+            unitOfWork = nested.Parent;
+        }
+
+        return unitOfWork;
     }
 }

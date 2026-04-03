@@ -229,7 +229,7 @@ public sealed class ScreenplayImportStatusListener(
                     if (allChunksDone)
                     {
                         logger.LogInformation("All chunks processed for screenplay {ScreenplayId}, running reconciliation", doneScreenplayId);
-                        var reconciliation = services.GetRequiredService<ChunkReconciliationService>();
+                        var reconciliation = services.GetRequiredService<IChunkReconciliationService>();
                         await reconciliation.ReconcileAsync(doneScreenplayId, ct);
                     }
 

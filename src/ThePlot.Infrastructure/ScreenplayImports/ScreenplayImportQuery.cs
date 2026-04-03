@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.ScreenplayImports;
+using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Infrastructure.ScreenplayImports;
 
-public sealed class ScreenplayImportQuery(ThePlotContext context) : IScreenplayImportQuery
+internal sealed class ScreenplayImportQuery(ThePlotContext context) : IScreenplayImportQuery, IExecutableQuery<ScreenplayImport>
 {
     private IQueryable<ScreenplayImport> _query = context.ScreenplayImports.AsNoTracking();
 
-    public IQueryable<ScreenplayImport> AsQueryable() => _query;
+    IQueryable<ScreenplayImport> IExecutableQuery<ScreenplayImport>.AsQueryable() => _query;
 
     public IScreenplayImportQuery ByScreenplayId(Guid screenplayId)
     {

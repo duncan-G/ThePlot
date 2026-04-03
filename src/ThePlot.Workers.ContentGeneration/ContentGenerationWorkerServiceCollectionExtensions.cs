@@ -17,6 +17,7 @@ public static class ContentGenerationWorkerServiceCollectionExtensions
         services.AddContentGenerationInfrastructure(configuration);
         services.AddScoped<ContentGenerationRunService>();
         services.AddScoped<GenerationNodeExecutor>();
+        services.AddSingleton<ContentGenerationWorkPublisher>();
         return services;
     }
 
