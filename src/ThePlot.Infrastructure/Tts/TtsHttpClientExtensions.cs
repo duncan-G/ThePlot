@@ -25,8 +25,13 @@ public static class TtsHttpClientExtensions
             });
 
         services
-            .AddTextToSpeechClient(sp => sp.GetRequiredService<TtsSpeechClient>())
-            .UseOpenTelemetry();
+            .AddTextToSpeechClient(sp =>
+            {
+                var client = sp.GetRequiredService<TtsSpeechClient>();
+                client.EnableSensitiveData = true;
+                return client;
+            })
+            .UseOpenTelemetry(configure: o => o.EnableSensitiveData = true);
 
         return services;
     }

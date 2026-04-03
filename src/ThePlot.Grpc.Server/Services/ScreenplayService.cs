@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Grpc.Core;
-using Microsoft.EntityFrameworkCore;
 using ThePlot.Core.Characters;
 using ThePlot.Core.Locations;
 using ThePlot.Core.SceneElements;
@@ -8,7 +7,6 @@ using ThePlot.Core.Scenes;
 using ThePlot.Core.ScreenplayImports;
 using ThePlot.Core.Screenplays;
 using ScreenplayEntity = ThePlot.Core.Screenplays.Screenplay;
-using ThePlot.Infrastructure;
 using ThePlot.Database.Abstractions;
 
 namespace ThePlot.Grpc.Server.Services;
@@ -151,13 +149,19 @@ public sealed class ScreenplayGrpcService(
             var characterIds = elements.Where(e => e.CharacterId.HasValue).Select(e => e.CharacterId!.Value).Distinct().ToList();
             var locationIds = scenes.Where(s => s.LocationId.HasValue).Select(s => s.LocationId!.Value).Distinct().ToList();
 
-            var db = sp.GetRequiredService<ThePlotContext>();
-            characters = characterIds.Count > 0
-                ? await db.Characters.AsNoTracking().Where(c => characterIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, context.CancellationToken)
-                : new Dictionary<Guid, Character>();
-            locations = locationIds.Count > 0
-                ? await db.Locations.AsNoTracking().Where(l => locationIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, context.CancellationToken)
-                : new Dictionary<Guid, Location>();
+            var characterQueryFactory = sp.GetRequiredService<IQueryFactory<Character, ICharacterQuery>>();
+            var characterRepo = sp.GetRequiredService<ICharacterRepository>();
+            var characterList = characterIds.Count > 0
+                ? await characterRepo.GetByQueryAsync(characterQueryFactory.Create().ByIds(characterIds).IncludeVoice(), context.CancellationToken)
+                : [];
+            characters = characterList.ToDictionary(c => c.Id);
+
+            var locationQueryFactory = sp.GetRequiredService<IQueryFactory<Location, ILocationQuery>>();
+            var locationRepo = sp.GetRequiredService<ILocationRepository>();
+            var locationList = locationIds.Count > 0
+                ? await locationRepo.GetByQueryAsync(locationQueryFactory.Create().ByIds(locationIds), context.CancellationToken)
+                : [];
+            locations = locationList.ToDictionary(l => l.Id);
         }
 
         var elementsByScene = elements
@@ -212,6 +216,18 @@ public sealed class ScreenplayGrpcService(
             }
 
             response.Scenes.Add(sm);
+        }
+
+        foreach (var character in characters.Values.OrderBy(c => c.Name))
+        {
+            var ci = new CharacterInfoMessage
+            {
+                Name = character.Name,
+                VoiceName = character.Voice?.Name ?? "",
+                VoiceDescription = character.Voice?.Description ?? "",
+            };
+            ci.Aliases.AddRange(character.Aliases);
+            response.CharacterInfo.Add(ci);
         }
 
         return response;

@@ -77,11 +77,12 @@ public sealed class VoiceDeterminationService(
     {
         var description = await GenerateVoiceDescriptionAsync(
             $"""
-            You are a voice casting director. Given the following screenplay content, describe the ideal narrator voice in 1-2 sentences.
-            Focus on tone, gender, age, accent, energy level, and stylistic qualities.
-            Respond ONLY with the voice description, nothing else.
+            Read the screenplay below carefully. Based on its tone, setting, genre, and subject matter, describe the ideal narrator as a person in 1-2 sentences.
+            Focus on vocal qualities (pitch, texture, pacing, accent) and emotional delivery that match THIS specific story.
+            Write a direct description starting with "A" or "An" — do not list attributes or write a casting brief.
+            Respond ONLY with the description.
 
-            Screenplay content:
+            Screenplay:
             {screenplaySummary}
             """,
             ct);
@@ -116,11 +117,10 @@ public sealed class VoiceDeterminationService(
     {
         var description = await GenerateVoiceDescriptionAsync(
             $"""
-            You are a voice casting director. Based on this character's dialogue and their role within the screenplay, describe their voice in 1-2 sentences.
-            Focus on gender, age range, accent, tone, energy, and distinguishing vocal qualities.
-            Respond ONLY with the voice description, nothing else.
-
-            Character name: {characterName}
+            Read the dialogue and screenplay context below. Describe the voice of the character "{characterName}" as a person in 1-2 sentences.
+            Infer their age, vocal texture, accent, pacing, and emotional tone from what they say and how they fit into the story.
+            Write a direct description starting with "A" or "An" — do not list attributes or write a casting brief.
+            Respond ONLY with the description.
 
             Character dialogue:
             {dialogue}

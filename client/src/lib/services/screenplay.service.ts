@@ -46,11 +46,19 @@ export interface ScreenplayElement {
   sequenceOrder: number;
 }
 
+export interface CharacterInfo {
+  name: string;
+  aliases: string[];
+  voiceName: string;
+  voiceDescription: string;
+}
+
 export interface ScreenplayData {
   id: string;
   title: string;
   authors: string[];
   scenes: ScreenplayScene[];
+  characters: CharacterInfo[];
   totalPages: number;
 }
 
@@ -164,7 +172,17 @@ function mapResponse(res: GetScreenplayResponse): ScreenplayData {
     title: res.getTitle(),
     authors: res.getAuthorsList(),
     scenes: res.getScenesList().map(mapScene),
+    characters: ((res as any).getCharacterInfoList?.() ?? []).map(mapCharacterInfo),
     totalPages: res.getTotalPages(),
+  };
+}
+
+function mapCharacterInfo(ci: any): CharacterInfo {
+  return {
+    name: ci.getName(),
+    aliases: ci.getAliasesList(),
+    voiceName: ci.getVoiceName(),
+    voiceDescription: ci.getVoiceDescription(),
   };
 }
 

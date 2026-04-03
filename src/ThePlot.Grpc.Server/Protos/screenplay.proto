@@ -42,6 +42,14 @@ message GetScreenplayResponse {
   repeated string authors = 3;
   repeated SceneMessage scenes = 4;
   int32 total_pages = 5;
+  repeated CharacterInfoMessage character_info = 6;
+}
+
+message CharacterInfoMessage {
+  string name = 1;
+  repeated string aliases = 2;
+  string voice_name = 3;
+  string voice_description = 4;
 }
 
 message SceneMessage {

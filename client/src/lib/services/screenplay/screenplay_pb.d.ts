@@ -96,6 +96,11 @@ export class GetScreenplayResponse extends jspb.Message {
   getTotalPages(): number;
   setTotalPages(value: number): GetScreenplayResponse;
 
+  getCharacterInfoList(): Array<CharacterInfoMessage>;
+  setCharacterInfoList(value: Array<CharacterInfoMessage>): GetScreenplayResponse;
+  clearCharacterInfoList(): GetScreenplayResponse;
+  addCharacterInfo(value?: CharacterInfoMessage, index?: number): CharacterInfoMessage;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): GetScreenplayResponse.AsObject;
   static toObject(includeInstance: boolean, msg: GetScreenplayResponse): GetScreenplayResponse.AsObject;
@@ -111,6 +116,39 @@ export namespace GetScreenplayResponse {
     authorsList: Array<string>,
     scenesList: Array<SceneMessage.AsObject>,
     totalPages: number,
+    characterInfoList: Array<CharacterInfoMessage.AsObject>,
+  }
+}
+
+export class CharacterInfoMessage extends jspb.Message {
+  getName(): string;
+  setName(value: string): CharacterInfoMessage;
+
+  getAliasesList(): Array<string>;
+  setAliasesList(value: Array<string>): CharacterInfoMessage;
+  clearAliasesList(): CharacterInfoMessage;
+  addAliases(value: string, index?: number): CharacterInfoMessage;
+
+  getVoiceName(): string;
+  setVoiceName(value: string): CharacterInfoMessage;
+
+  getVoiceDescription(): string;
+  setVoiceDescription(value: string): CharacterInfoMessage;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CharacterInfoMessage.AsObject;
+  static toObject(includeInstance: boolean, msg: CharacterInfoMessage): CharacterInfoMessage.AsObject;
+  static serializeBinaryToWriter(message: CharacterInfoMessage, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CharacterInfoMessage;
+  static deserializeBinaryFromReader(message: CharacterInfoMessage, reader: jspb.BinaryReader): CharacterInfoMessage;
+}
+
+export namespace CharacterInfoMessage {
+  export type AsObject = {
+    name: string,
+    aliasesList: Array<string>,
+    voiceName: string,
+    voiceDescription: string,
   }
 }
 

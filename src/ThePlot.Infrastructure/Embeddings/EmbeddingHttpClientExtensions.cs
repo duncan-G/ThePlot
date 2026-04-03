@@ -16,7 +16,12 @@ public static class EmbeddingHttpClientExtensions
             })
             .SetHandlerLifetime(TimeSpan.FromMinutes(5));
 
-        builder.AddStandardResilienceHandler();
+        builder.AddStandardResilienceHandler(options =>
+        {
+            options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(2);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(5);
+        });
 
         return builder;
     }

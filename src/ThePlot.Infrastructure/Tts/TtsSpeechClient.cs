@@ -1,7 +1,10 @@
 #pragma warning disable MEAI001
+using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 
@@ -16,8 +19,26 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
     private const string DefaultVoiceDesignInstructions =
         "A clear, natural English voice with neutral, friendly tone, suitable for narration.";
 
-    public TextToSpeechClientMetadata Metadata { get; } =
-        new("vllm", new Uri("https://github.com/vllm-project/vllm"), DefaultModel);
+    public TextToSpeechClientMetadata Metadata { get; } = CreateMetadata(configuration);
+
+    /// <summary>
+    /// Gets or sets a value indicating whether potentially sensitive information (e.g. the input
+    /// text and audio output) should be added to the active <see cref="Activity"/> span as tags.
+    /// Mirrors the <c>EnableSensitiveData</c> property on <see cref="OpenTelemetryTextToSpeechClient"/>
+    /// and respects the same <c>OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT</c> environment variable.
+    /// </summary>
+    public bool EnableSensitiveData { get; set; } =
+        string.Equals(
+            Environment.GetEnvironmentVariable("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    private static TextToSpeechClientMetadata CreateMetadata(IConfiguration configuration)
+    {
+        var (endpoint, _) = ParseConnectionString(configuration.GetConnectionString(ConnectionStringName));
+        Uri? providerUri = !string.IsNullOrWhiteSpace(endpoint) ? new Uri(endpoint) : null;
+        return new TextToSpeechClientMetadata("vllm", providerUri, DefaultModel);
+    }
 
     public async Task<TextToSpeechResponse> GetAudioAsync(
         string inputText,
@@ -80,6 +101,28 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
 
         request.Content = JsonContent.Create(payload);
 
+        var telemetryActivity = EnableSensitiveData ? Activity.Current : null;
+
+        if (telemetryActivity is { IsAllDataRequested: true })
+        {
+            var inputMessages = JsonSerializer.Serialize(new[]
+            {
+                new
+                {
+                    role = "user",
+                    parts = new object[]
+                    {
+                        new
+                        {
+                            type = "text",
+                            content = inputText,
+                        }
+                    }
+                }
+            });
+            _ = telemetryActivity.AddTag("gen_ai.input.messages", inputMessages);
+        }
+
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
 
@@ -98,7 +141,34 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
 
         var mediaType = AudioMediaTypeFromResponse(responseFormat, response.Content.Headers.ContentType?.MediaType);
 
-        return new TextToSpeechResponse([new DataContent(bytes, mediaType)]);
+        var ttsResponse = new TextToSpeechResponse([new DataContent(bytes, mediaType)])
+        {
+            ModelId = model,
+        };
+
+        if (telemetryActivity is { IsAllDataRequested: true })
+        {
+            var outputMessages = JsonSerializer.Serialize(new[]
+            {
+                new
+                {
+                    role = "assistant",
+                    parts = new object[]
+                    {
+                        new
+                        {
+                            type = "blob",
+                            content = Convert.ToBase64String(bytes),
+                            mime_type = mediaType,
+                            modality = "audio",
+                        }
+                    }
+                }
+            });
+            _ = telemetryActivity.AddTag("gen_ai.output.messages", outputMessages);
+        }
+
+        return ttsResponse;
     }
 
     public async IAsyncEnumerable<TextToSpeechResponseUpdate> GetStreamingAudioAsync(
@@ -113,10 +183,64 @@ public sealed class TtsSpeechClient(HttpClient httpClient, IConfiguration config
         }
     }
 
-    public object? GetService(Type serviceType, object? serviceKey = null) =>
-        serviceKey is null && serviceType?.IsInstanceOfType(this) is true ? this : null;
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        if (serviceKey is not null)
+        {
+            return null;
+        }
+
+        if (serviceType == typeof(TextToSpeechClientMetadata))
+        {
+            return Metadata;
+        }
+
+        return serviceType?.IsInstanceOfType(this) is true ? this : null;
+    }
 
     public void Dispose() { }
+
+    /// <summary>
+    /// Estimates the number of audio tokens produced by parsing the WAV header for duration,
+    /// then multiplying by the token rate encoded in the model name (e.g. "12Hz" → 12 tokens/s).
+    /// Returns 0 when the format is not WAV or the header is malformed.
+    /// </summary>
+    private static int EstimateAudioTokens(byte[] bytes, string responseFormat, string modelId)
+    {
+        if (!string.Equals(responseFormat, "wav", StringComparison.OrdinalIgnoreCase) || bytes.Length < 44)
+        {
+            return 0;
+        }
+
+        ReadOnlySpan<byte> header = bytes;
+
+        var sampleRate = BinaryPrimitives.ReadInt32LittleEndian(header.Slice(24, 4));
+        var channels = BinaryPrimitives.ReadInt16LittleEndian(header.Slice(22, 2));
+        var bitsPerSample = BinaryPrimitives.ReadInt16LittleEndian(header.Slice(34, 2));
+        var dataSize = BinaryPrimitives.ReadInt32LittleEndian(header.Slice(40, 4));
+
+        var bytesPerSecond = sampleRate * channels * (bitsPerSample / 8);
+        if (bytesPerSecond <= 0)
+        {
+            return 0;
+        }
+
+        var durationSeconds = (double)dataSize / bytesPerSecond;
+        var tokenRate = ExtractTokenRateHz(modelId);
+        return (int)Math.Round(durationSeconds * tokenRate);
+    }
+
+    /// <summary>
+    /// Extracts the Hz token rate from a model name like "Qwen3-TTS-12Hz-…".
+    /// Falls back to 12 if the pattern is absent.
+    /// </summary>
+    private static double ExtractTokenRateHz(string modelId)
+    {
+        const double fallback = 12.0;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            modelId, @"(\d+(?:\.\d+)?)Hz", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return match.Success && double.TryParse(match.Groups[1].Value, out var rate) ? rate : fallback;
+    }
 
     private static string AudioMediaTypeFromResponse(string configuredFormat, string? mediaType)
     {

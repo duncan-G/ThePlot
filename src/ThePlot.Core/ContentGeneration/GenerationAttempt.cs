@@ -16,6 +16,11 @@ public sealed class GenerationAttempt : IDateStamped
     public JsonDocument? ProviderRequestJson { get; private set; }
     public JsonDocument? ProviderResponseJson { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public int InputTextTokens { get; private set; }
+    public int InputAudioTokens { get; private set; }
+    public int OutputTextTokens { get; private set; }
+    public int OutputAudioTokens { get; private set; }
+    public decimal Cost { get; private set; }
     public DateTime? StartedAtUtc { get; private set; }
     public DateTime? CompletedAtUtc { get; private set; }
     public DateTime DateCreated { get; set; }
@@ -49,6 +54,15 @@ public sealed class GenerationAttempt : IDateStamped
         ProviderResponseJson = responseJson;
         CompletedAtUtc = DateTime.UtcNow;
         ErrorMessage = null;
+    }
+
+    public void RecordUsage(TokenUsage usage, decimal cost)
+    {
+        InputTextTokens = usage.InputTextTokens;
+        InputAudioTokens = usage.InputAudioTokens;
+        OutputTextTokens = usage.OutputTextTokens;
+        OutputAudioTokens = usage.OutputAudioTokens;
+        Cost = cost;
     }
 
     public void MarkFailed(string message, JsonDocument? responseJson = null)

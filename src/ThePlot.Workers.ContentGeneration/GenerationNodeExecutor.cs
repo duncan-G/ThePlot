@@ -125,6 +125,7 @@ public sealed class GenerationNodeExecutor(
 
     private async Task ExecuteTtsAsync(GenerationNode node, GenerationAttempt attempt, CancellationToken ct)
     {
+        var opt = options.Value;
         var prompt = BuildTtsPrompt(node);
         attempt.SetProviderRequestJson(JsonSerializer.SerializeToDocument(new { prompt, node.Kind }));
 
@@ -136,6 +137,9 @@ public sealed class GenerationNodeExecutor(
         var audioFormat = mediaType.Split('/').LastOrDefault() ?? "wav";
         if (audioFormat == "mpeg") audioFormat = "mp3";
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(audioRaw)));
+
+        var usage = TokenUsage.None;
+        attempt.RecordUsage(usage, opt.TtsPricing.CalculateCost(usage));
 
         var artifact = GeneratedArtifact.Create(
             node.Id,

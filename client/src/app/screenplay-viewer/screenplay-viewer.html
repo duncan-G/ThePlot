@@ -85,6 +85,15 @@
           Script
         </button>
 
+        <button type="button" (click)="switchTab('characters')"
+          [class]="'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors '
+            + (activeTab() === 'characters' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-accent hover:text-foreground')">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+          </svg>
+          Characters
+        </button>
+
         <button type="button" (click)="switchTab('generation')"
           [class]="'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors '
             + (activeTab() === 'generation' ? 'bg-primary/10 text-primary' : 'text-foreground/70 hover:bg-accent hover:text-foreground')">
@@ -621,6 +630,67 @@
         </div>
       }
 
+      <!-- Characters tab panel -->
+      @if (activeTab() === 'characters') {
+        <div class="vertical-scroll flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          @if (characters().length === 0) {
+            <div class="flex flex-col items-center justify-center py-16 text-center">
+              <svg class="mb-4 h-10 w-10 text-muted-foreground/30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+              </svg>
+              <p class="font-mono text-sm text-muted-foreground">No characters found.</p>
+              <p class="mt-1 font-mono text-xs text-muted-foreground/60">Characters will appear after importing a screenplay.</p>
+            </div>
+          } @else {
+            <div class="space-y-3">
+              @for (char of characters(); track char.name) {
+                <div class="rounded-xl border border-border bg-card px-4 py-4">
+                  <div class="flex items-start gap-3">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <svg class="h-4.5 w-4.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <h3 class="font-mono text-sm font-bold uppercase tracking-wide text-foreground">{{ char.name }}</h3>
+
+                      @if (char.aliases.length > 0) {
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          @for (alias of char.aliases; track alias) {
+                            <span class="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{{ alias }}</span>
+                          }
+                        </div>
+                      }
+
+                      @if (char.voiceName) {
+                        <div class="mt-3 rounded-lg border border-border/60 bg-background/50 px-3 py-2.5">
+                          <div class="flex items-center gap-2">
+                            <svg class="h-3.5 w-3.5 shrink-0 text-primary/70" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
+                            </svg>
+                            <span class="font-mono text-xs font-medium text-foreground">{{ char.voiceName }}</span>
+                          </div>
+                          @if (char.voiceDescription) {
+                            <p class="mt-1.5 font-mono text-[11px] italic leading-relaxed text-muted-foreground">{{ char.voiceDescription }}</p>
+                          }
+                        </div>
+                      } @else {
+                        <div class="mt-3 flex items-center gap-2 text-muted-foreground/50">
+                          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" />
+                          </svg>
+                          <span class="font-mono text-[11px]">No voice assigned</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+
       <!-- Scene content -->
       @if (activeTab() === 'screenplay') {
       <div class="vertical-scroll flex-1 overflow-y-auto">
@@ -878,6 +948,15 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
             </svg>
             Script
+          </button>
+          <button type="button" (click)="switchTab('characters')"
+            [class]="'flex h-7 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-[11px] transition-colors lg:hidden '
+              + (activeTab() === 'characters' ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground')"
+            aria-label="Show characters">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+            </svg>
+            Characters
           </button>
           <button type="button" (click)="switchTab('generation')"
             [class]="'flex h-7 items-center gap-1.5 rounded-lg border px-2.5 font-mono text-[11px] transition-colors lg:hidden '

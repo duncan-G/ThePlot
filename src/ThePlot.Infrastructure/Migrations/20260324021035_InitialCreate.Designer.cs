@@ -133,6 +133,12 @@ namespace ThePlot.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at_utc");
 
+                    b.Property<decimal>("Cost")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("cost");
+
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date_created");
@@ -148,6 +154,30 @@ namespace ThePlot.Infrastructure.Migrations
                     b.Property<Guid>("GenerationNodeId")
                         .HasColumnType("uuid")
                         .HasColumnName("generation_node_id");
+
+                    b.Property<int>("InputAudioTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("input_audio_tokens");
+
+                    b.Property<int>("InputTextTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("input_text_tokens");
+
+                    b.Property<int>("OutputAudioTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("output_audio_tokens");
+
+                    b.Property<int>("OutputTextTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("output_text_tokens");
 
                     b.Property<JsonDocument>("ProviderRequestJson")
                         .HasColumnType("jsonb")

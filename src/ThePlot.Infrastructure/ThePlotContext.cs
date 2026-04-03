@@ -196,6 +196,11 @@ public sealed class ThePlotContext(
             builder.Property(a => a.Status).HasConversion<string>();
             builder.Property(a => a.ProviderRequestJson).HasColumnType("jsonb");
             builder.Property(a => a.ProviderResponseJson).HasColumnType("jsonb");
+            builder.Property(a => a.InputTextTokens).HasDefaultValue(0);
+            builder.Property(a => a.InputAudioTokens).HasDefaultValue(0);
+            builder.Property(a => a.OutputTextTokens).HasDefaultValue(0);
+            builder.Property(a => a.OutputAudioTokens).HasDefaultValue(0);
+            builder.Property(a => a.Cost).HasDefaultValue(0m);
             builder.HasQueryFilter(a => a.GenerationNode != null
                 && a.GenerationNode.GenerationRun != null
                 && a.GenerationNode.GenerationRun.Screenplay != null

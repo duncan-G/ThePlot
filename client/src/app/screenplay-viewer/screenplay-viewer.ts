@@ -17,6 +17,7 @@ import {
   ScreenplayData,
   ScreenplayScene,
   ScreenplayElement,
+  CharacterInfo,
 } from '../../lib/services/screenplay.service';
 import {
   ContentGenerationService,
@@ -35,7 +36,7 @@ import { ThemeService } from '../../lib/services/theme.service';
 
 type ViewState = 'importing' | 'viewing' | 'error';
 type GenerationState = 'idle' | 'starting' | 'running' | 'completed' | 'failed';
-type ActiveTab = 'screenplay' | 'generation';
+type ActiveTab = 'screenplay' | 'characters' | 'generation';
 type NodeFilter = 'all' | 'succeeded' | 'failed' | 'pending';
 
 interface SceneNodeGroup {
@@ -157,6 +158,7 @@ export class ScreenplayViewer implements OnInit, OnDestroy {
   });
 
   protected readonly scenes = computed(() => this.screenplay()?.scenes ?? []);
+  protected readonly characters = computed(() => this.screenplay()?.characters ?? []);
 
   protected readonly isAllDone = computed(() => {
     const c = this.chunks();

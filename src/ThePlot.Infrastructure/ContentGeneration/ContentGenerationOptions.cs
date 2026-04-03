@@ -1,3 +1,5 @@
+using ThePlot.Core.ContentGeneration;
+
 namespace ThePlot.Infrastructure.ContentGeneration;
 
 public sealed class ContentGenerationOptions
@@ -21,4 +23,13 @@ public sealed class ContentGenerationOptions
     /// allowing vLLM to batch requests rather than process them one at a time.
     /// </summary>
     public int TtsBatchSize { get; set; } = 4;
+
+    /// <summary>Pricing for the chat/LLM client (cost per 1M tokens). Zero for local models.</summary>
+    public ModelPricing ChatPricing { get; set; } = ModelPricing.Zero;
+
+    /// <summary>Pricing for the embedding client (cost per 1M tokens). Zero for local models.</summary>
+    public ModelPricing EmbeddingPricing { get; set; } = ModelPricing.Zero;
+
+    /// <summary>Pricing for the TTS client (cost per 1M tokens). Zero for local models.</summary>
+    public ModelPricing TtsPricing { get; set; } = ModelPricing.Zero;
 }
